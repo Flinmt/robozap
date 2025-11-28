@@ -1,25 +1,25 @@
 require('dotenv').config();
 const sql = require('mssql');
 const axios = require('axios');
-const express = require('express'); // Adicionado para manter a nuvem ativa
+const express = require('express');
 
-// --- CONFIGURAÇÃO DO SERVIDOR WEB (TRUQUE PARA O RENDER/HEROKU) ---
+// --- CONFIGURAÇÃO DO SERVIDOR WEB ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('O Robô do WhatsApp está rodando e operante! 🤖');
+    res.send('O Robô do WhatsApp está rodando e operante! 🤖 (Modo: Apenas Agenda Inicio)');
 });
 
 app.listen(PORT, () => {
     console.log(`Servidor Web ouvindo na porta ${PORT}`);
 });
 
-// --- CONFIGURAÇÃO DO BANCO DE DADOS (AGORA PODE USAR HOST REMOTO) ---
+// --- CONFIGURAÇÃO DO BANCO DE DADOS ---
 const dbConfig = {
-    user: process.env.DB_USER,        // Defina no .env ou Painel da Nuvem
-    password: process.env.DB_PASSWORD,// Defina no .env ou Painel da Nuvem
-    server: process.env.DB_SERVER,    // IP ou DNS do seu Banco (Ex: 200.189.x.x)
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    server: process.env.DB_SERVER,
     database: process.env.DB_NAME || 'biodata',
     options: {
         encrypt: false, 
@@ -32,15 +32,21 @@ const dbConfig = {
 const PARTNERBOT_URL = 'https://painel.partnerbot.com.br/v2/api/external/de10bffc-f911-4d63-ac53-80b6648aa5d4/template';
 const AUTH_TOKEN = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6OSwicHJvZmlsZSI6ImFkbWluIiwic2Vzc2lvbklkIjo4OSwiaWF0IjoxNzY0MzY2NzI1LCJleHAiOjE4Mjc0Mzg3MjV9.GC18WTtV-nqwQCV9b0GbJsx1dvW2RuHeTbwuy-CDCow';
 
-// TEMPO DE ESPERA (10 segundos)
 const INTERVALO_CHECK = 10000;
+
+// Função auxiliar para limpar texto e evitar erro 400 (vazio)
+function limparTexto(texto) {
+    if (!texto) return "-"; 
+    const textoLimpo = String(texto).replace(/[\r\n"]/g, " ").trim();
+    return textoLimpo === "" ? "-" : textoLimpo;
+}
 
 async function processarFila() {
     let pool;
     try {
-        // console.log(`[${new Date().toLocaleTimeString()}] Verificando fila...`); // Comentei para não lotar o log da nuvem
         pool = await sql.connect(dbConfig);
 
+        // ALTERAÇÃO 1: Filtro SQL ajustado APENAS para 'agendainicio'
         const querySelect = `
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
@@ -56,7 +62,7 @@ async function processarFila() {
             from tblWhatsAppEnvio W
             inner join vwAgenda a on a.intAgendaId=w.intAgendaId
             where IsNull(bolEnviado,'N') <> 'S' 
-            and strTipo in('agenda','agendainicio','Cadencia')
+            and strTipo = 'agendainicio' -- <--- FILTRO RESTRITO AQUI
             and len(W.strTelefone)>=10 
             AND CONVERT(DATE, datWhatsAppEnvio) = CONVERT(DATE, GETDATE())
             order by datWhatsAppEnvio
@@ -66,58 +72,28 @@ async function processarFila() {
         const listaEnvio = result.recordset;
 
         if (listaEnvio.length > 0) {
-            console.log(`🔍 Encontradas ${listaEnvio.length} mensagens para enviar.`);
+            console.log(`🔍 Encontradas ${listaEnvio.length} mensagens do tipo AGENDAINICIO.`);
             
             for (const msg of listaEnvio) {
                 try {
-                    const p_agenda = (msg.strAgenda || "").replace(/[\r\n"]/g, " ");
-                    const p_data = (msg.datagenda || "").replace(/[\r\n"]/g, " ");
-                    const p_hora = (msg.strHora || "").replace(/[\r\n"]/g, " ");
-                    const p_profissional = (msg.strProfissional || "").replace(/[\r\n"]/g, " ");
-                    const p_unidade = (msg.strunidade || "").replace(/[\r\n"]/g, " ");
-                    const p_link = (msg.Link || "");
-
-                    let templateName = "";
-                    let components = [];
-
-                    if (msg.strTipo.toUpperCase() === 'AGENDAINICIO') {
-                        // CASO 1: SEM LINK (Apenas texto)
-                        templateName = "primeira_consulta_exame";
-                        components = [{
-                            type: "body",
-                            parameters: [
-                                { type: "text", text: p_agenda },
-                                { type: "text", text: p_data },
-                                { type: "text", text: p_hora },
-                                { type: "text", text: p_profissional },
-                                { type: "text", text: p_unidade }
-                            ]
-                        }];
-                    } else {
-                        // CASO 2: COM LINK (Texto + Botão URL)
-                        // Ajustado para 'confirma_nova' conforme seu curl, mas COM O BOTÃO.
-                        templateName = "confirma_nova"; 
-                        components = [
-                            {
-                                type: "body",
-                                parameters: [
-                                    { type: "text", text: p_agenda },
-                                    { type: "text", text: p_data },
-                                    { type: "text", text: p_hora },
-                                    { type: "text", text: p_profissional },
-                                    { type: "text", text: p_unidade }
-                                ]
-                            },
-                            {
-                                type: "button",
-                                sub_type: "url",
-                                index: "0",
-                                parameters: [
-                                    { type: "text", text: p_link }
-                                ]
-                            }
-                        ];
-                    }
+                    const p_agenda = limparTexto(msg.strAgenda);
+                    const p_data = limparTexto(msg.datagenda);
+                    const p_hora = limparTexto(msg.strHora);
+                    const p_profissional = limparTexto(msg.strProfissional);
+                    const p_unidade = limparTexto(msg.strunidade);
+                    
+                    // ALTERAÇÃO 2: Código simplificado apenas para 'primeira_consulta_exame'
+                    const templateName = "primeira_consulta_exame";
+                    const components = [{
+                        type: "body",
+                        parameters: [
+                            { type: "text", text: p_agenda },
+                            { type: "text", text: p_data },
+                            { type: "text", text: p_hora },
+                            { type: "text", text: p_profissional },
+                            { type: "text", text: p_unidade }
+                        ]
+                    }];
 
                     const payload = {
                         number: msg.strtelefone,
@@ -130,7 +106,7 @@ async function processarFila() {
                         }
                     };
 
-                    console.log(`📤 Enviando ID ${msg.intWhatsAppEnvioId} (${msg.strTipo})...`);
+                    console.log(`📤 Enviando ID ${msg.intWhatsAppEnvioId} (${templateName})...`);
                     
                     await axios.post(PARTNERBOT_URL, payload, {
                         headers: { 'Content-Type': 'application/json', 'Authorization': AUTH_TOKEN }
@@ -143,8 +119,11 @@ async function processarFila() {
                     console.log(`✅ Sucesso ID: ${msg.intWhatsAppEnvioId}`);
 
                 } catch (errEnvio) {
-                    const errorData = errEnvio.response ? JSON.stringify(errEnvio.response.data) : errEnvio.message;
-                    console.error(`❌ Erro ID ${msg.intWhatsAppEnvioId}:`, errorData);
+                    let errorMsg = errEnvio.message;
+                    if (errEnvio.response && errEnvio.response.data) {
+                        errorMsg = JSON.stringify(errEnvio.response.data);
+                    }
+                    console.error(`❌ Erro ID ${msg.intWhatsAppEnvioId}:`, errorMsg);
                 }
             }
         }
@@ -155,6 +134,5 @@ async function processarFila() {
     }
 }
 
-// Inicia o loop infinito
 setInterval(processarFila, INTERVALO_CHECK);
-console.log("🚀 Sistema iniciado com servidor Web para nuvem.");
+console.log("🚀 Sistema iniciado (Filtro: Apenas AGENDAINICIO).");
