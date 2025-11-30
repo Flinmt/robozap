@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('O Robô do WhatsApp está rodando e operante! 🤖 (Template: confirma_nova)');
+    res.send('O Robô do WhatsApp está rodando! 🤖 (Template: confirma_nova)');
 });
 
 app.listen(PORT, () => {
@@ -34,12 +34,10 @@ const AUTH_TOKEN = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6
 
 const INTERVALO_CHECK = 10000;
 
-// Função auxiliar para limpar texto e evitar erro 400 (vazio)
+// Função para limpar texto (Remove aspas, quebras de linha e evita vazio)
 function limparTexto(texto) {
     if (texto === null || texto === undefined) return "-"; 
-    // Remove quebras de linha e aspas que podem quebrar o JSON
     const textoLimpo = String(texto).replace(/[\r\n"]/g, " ").trim();
-    // Meta rejeita strings vazias, então enviamos um traço ou espaço
     return textoLimpo === "" ? "-" : textoLimpo;
 }
 
@@ -48,7 +46,7 @@ async function processarFila() {
     try {
         pool = await sql.connect(dbConfig);
 
-        // Filtro ajustado APENAS para 'agendainicio'
+        // SELECIONA MENSAGENS PENDENTES (Apenas <> 'S')
         const querySelect = `
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
@@ -74,82 +72,90 @@ async function processarFila() {
         const listaEnvio = result.recordset;
 
         if (listaEnvio.length > 0) {
-            console.log(`🔍 Encontradas ${listaEnvio.length} mensagens do tipo AGENDAINICIO.`);
+            console.log(`🔍 Encontradas ${listaEnvio.length} mensagens.`);
             
             for (const msg of listaEnvio) {
                 try {
-                    // Limpeza de variáveis
+                    // 1. PREPARAÇÃO DOS DADOS
+                    const telefoneFinal = String(msg.strtelefone).replace(/\D/g, ""); // Só números
+                    
+                    // Validação de segurança do número
+                    if (!telefoneFinal || telefoneFinal.length < 10) {
+                         throw new Error(`Número inválido: '${telefoneFinal}'`);
+                    }
+
+                    // Variáveis mapeadas
                     const p_agenda = limparTexto(msg.strAgenda);
                     const p_data = limparTexto(msg.datagenda);
                     const p_hora = limparTexto(msg.strHora);
                     const p_profissional = limparTexto(msg.strProfissional);
                     const p_unidade = limparTexto(msg.strunidade);
-                    
-                    // Limpeza do telefone (garante apenas números)
-                    const telefoneFinal = String(msg.strtelefone).replace(/\D/g, "");
 
-                    // --- AJUSTE CRÍTICO: Usando o template que funcionou no seu CURL ---
-                    const templateName = "confirma_nova";
-                    
-                    const parameters = [
-                        { type: "text", text: p_agenda },       // {{1}}
-                        { type: "text", text: p_data },         // {{2}}
-                        { type: "text", text: p_hora },         // {{3}}
-                        { type: "text", text: p_profissional }, // {{4}}
-                        { type: "text", text: p_unidade }       // {{5}}
-                    ];
-
-                    const components = [{
-                        type: "body",
-                        parameters: parameters
-                    }];
-
+                    // 2. MONTAGEM DO JSON
                     const payload = {
                         number: telefoneFinal,
-                        isClosed: false, 
+                        isClosed: false,
                         templateData: {
                             messaging_product: "whatsapp",
                             to: telefoneFinal,
                             type: "template",
-                            template: { name: templateName, language: { code: "pt_BR" }, components: components }
+                            template: {
+                                name: "confirma_nova",
+                                language: {
+                                    code: "pt_BR"
+                                },
+                                components: [
+                                    {
+                                        type: "body",
+                                        parameters: [
+                                            { type: "text", text: p_agenda },       // "paciente"
+                                            { type: "text", text: p_data },         // "data"
+                                            { type: "text", text: p_hora },         // "hora"
+                                            { type: "text", text: p_profissional }, // "médico"
+                                            { type: "text", text: p_unidade }       // "endereço"
+                                        ]
+                                    }
+                                ]
+                            }
                         }
                     };
 
                     console.log(`📤 Enviando ID ${msg.intWhatsAppEnvioId} para ${telefoneFinal}...`);
-                    console.log(`   Template: ${templateName}`);
                     
+                    // 3. ENVIO
                     await axios.post(PARTNERBOT_URL, payload, {
                         headers: { 'Content-Type': 'application/json', 'Authorization': AUTH_TOKEN }
                     });
 
-                    // Sucesso: Atualiza banco
+                    // 4. ATUALIZAÇÃO (SUCESSO)
+                    // Agora enviamos o CONTEXT_INFO 0x123456 antes do UPDATE para passar pelo Trigger
                     await pool.request()
                         .input('id', sql.Int, msg.intWhatsAppEnvioId)
-                        .query(`UPDATE tblWhatsAppEnvio SET bolEnviado = 'S', datEnvioReal = GETDATE() WHERE intWhatsAppEnvioId = @id`);
+                        .query(`
+                            SET CONTEXT_INFO 0x123456; 
+                            UPDATE tblWhatsAppEnvio SET bolEnviado = 'S' WHERE intWhatsAppEnvioId = @id
+                        `);
                     
                     console.log(`✅ Sucesso ID: ${msg.intWhatsAppEnvioId}`);
 
                 } catch (errEnvio) {
+                    // 5. TRATAMENTO DE ERRO
+                    // NÃO ATUALIZA O BANCO (Mantém como 'N')
                     let errorMsg = errEnvio.message;
-                    // Tenta ler o erro detalhado que vem da Meta/PartnerBot
                     if (errEnvio.response && errEnvio.response.data) {
-                        try {
-                            const dataStr = JSON.stringify(errEnvio.response.data);
-                            errorMsg = dataStr; 
-                        } catch (e) {
-                            errorMsg = "Erro desconhecido na resposta da API";
-                        }
+                        try { errorMsg = JSON.stringify(errEnvio.response.data); } catch(e) {}
                     }
-                    console.error(`❌ Erro ID ${msg.intWhatsAppEnvioId}:`, errorMsg);
+                    console.error(`❌ Falha ID ${msg.intWhatsAppEnvioId}: ${errorMsg}`);
+                    console.error(`   -> Mensagem mantida na fila (Status 'N').`);
                 }
             }
         }
     } catch (err) {
-        console.error("⚠️ Erro de Conexão ou SQL:", err.message);
+        console.error("⚠️ Erro Geral:", err.message);
     } finally {
         if (pool) pool.close();
     }
 }
 
 setInterval(processarFila, INTERVALO_CHECK);
-console.log("🚀 Sistema iniciado (Template Corrigido: confirma_nova).");
+console.log("🚀 Robô Iniciado. Configuração: Template 'confirma_nova'.");
