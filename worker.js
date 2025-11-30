@@ -47,7 +47,7 @@ async function processarFila() {
         pool = await sql.connect(dbConfig);
 
         // SELECIONA MENSAGENS PENDENTES (Apenas <> 'S')
-        // Alteração: JOIN com tblAgenda e tblEmpresa para montar o endereço dinâmico
+        // Alteração: Trazemos as colunas separadas da tblEmpresa, sem concatenar no SQL
         const querySelect = `
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
@@ -58,8 +58,11 @@ async function processarFila() {
                 convert(varchar, w.datAgendamento, 103) as datagenda,
                 w.strHora,
                 a.strProfissional,
-                -- MONTAGEM DO ENDEREÇO VIA TBLEMPRESA:
-                (ISNULL(E.strEndereco, '') + ', ' + ISNULL(E.strNumero, 'S/N') + ' - ' + ISNULL(E.strBairro, '') + ' - ' + ISNULL(E.strEstado, '')) as strunidade,
+                -- TRAZENDO COLUNAS SEPARADAS PARA CONCATENAR NO NODE.JS:
+                E.strEndereco,
+                E.strNumero,
+                E.strBairro,
+                E.strEstado,
                 dbo.fncBase64_Encode(CONVERT(VARCHAR, w.intagendaid) + '-' + CONVERT(VARCHAR, GETDATE(), 120)) AS Link
             from tblWhatsAppEnvio W
             inner join vwAgenda a on a.intAgendaId = w.intAgendaId
@@ -93,7 +96,17 @@ async function processarFila() {
                     const p_data = limparTexto(msg.datagenda);
                     const p_hora = limparTexto(msg.strHora);
                     const p_profissional = limparTexto(msg.strProfissional);
-                    const p_unidade = limparTexto(msg.strunidade); // Agora vem da tblEmpresa
+
+                    // --- CONCATENAÇÃO FEITA AQUI NO JAVASCRIPT ---
+                    // Pega os valores brutos ou usa padrão se vier nulo
+                    const end_rua = msg.strEndereco || '';
+                    const end_num = msg.strNumero || 'S/N';
+                    const end_bairro = msg.strBairro || '';
+                    const end_uf = msg.strEstado || '';
+
+                    // Monta a string completa
+                    const enderecoCompleto = `${end_rua}, ${end_num} - ${end_bairro} - ${end_uf}`;
+                    const p_unidade = limparTexto(enderecoCompleto); 
 
                     // 2. MONTAGEM DO JSON
                     const payload = {
@@ -116,7 +129,7 @@ async function processarFila() {
                                             { type: "text", text: p_data },         // "data"
                                             { type: "text", text: p_hora },         // "hora"
                                             { type: "text", text: p_profissional }, // "médico"
-                                            { type: "text", text: p_unidade }       // "endereço" (tblEmpresa)
+                                            { type: "text", text: p_unidade }       // "endereço" (Concatenado no JS)
                                         ]
                                     }
                                 ]
