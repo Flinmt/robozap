@@ -47,25 +47,29 @@ async function processarFila() {
         pool = await sql.connect(dbConfig);
 
         // SELECIONA MENSAGENS PENDENTES (Apenas <> 'S')
+        // Alteração: JOIN com tblAgenda e tblEmpresa para montar o endereço dinâmico
         const querySelect = `
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
-                strTipo,
+                w.strTipo,
                 CASE WHEN a.strAgenda='' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
-                intWhatsAppEnvioId, 
-                W.intAgendaId,
-                convert(varchar,datAgendamento,103) as datagenda,
-                strHora,
+                w.intWhatsAppEnvioId, 
+                w.intAgendaId,
+                convert(varchar, w.datAgendamento, 103) as datagenda,
+                w.strHora,
                 a.strProfissional,
-                isnull(strUnidade,'Av. Júlia Rodrigues Torres 855 - Floresta, Belo Jardim - PE, CEP:55150-000') as strunidade,
+                -- MONTAGEM DO ENDEREÇO VIA TBLEMPRESA:
+                (ISNULL(E.strEndereco, '') + ', ' + ISNULL(E.strNumero, 'S/N') + ' - ' + ISNULL(E.strBairro, '') + ' - ' + ISNULL(E.strEstado, '')) as strunidade,
                 dbo.fncBase64_Encode(CONVERT(VARCHAR, w.intagendaid) + '-' + CONVERT(VARCHAR, GETDATE(), 120)) AS Link
             from tblWhatsAppEnvio W
-            inner join vwAgenda a on a.intAgendaId=w.intAgendaId
-            where IsNull(bolEnviado,'N') <> 'S' 
-            and strTipo = 'agendainicio' 
-            and len(W.strTelefone)>=10 
-            AND CONVERT(DATE, datWhatsAppEnvio) = CONVERT(DATE, GETDATE())
-            order by datWhatsAppEnvio
+            inner join vwAgenda a on a.intAgendaId = w.intAgendaId
+            inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    -- 1. Pega a Agenda real
+            inner join tblEmpresa E on E.intEmpresaId = TA.intEmpresaId  -- 2. Pega a Empresa pelo ID da Agenda
+            where IsNull(w.bolEnviado,'N') NOT IN ('S', 'E') 
+            and w.strTipo = 'agendainicio' 
+            and len(w.strTelefone) >= 10 
+            AND CONVERT(DATE, w.datWhatsAppEnvio) = CONVERT(DATE, GETDATE())
+            order by w.datWhatsAppEnvio
         `;
 
         const result = await pool.request().query(querySelect);
@@ -89,7 +93,7 @@ async function processarFila() {
                     const p_data = limparTexto(msg.datagenda);
                     const p_hora = limparTexto(msg.strHora);
                     const p_profissional = limparTexto(msg.strProfissional);
-                    const p_unidade = limparTexto(msg.strunidade);
+                    const p_unidade = limparTexto(msg.strunidade); // Agora vem da tblEmpresa
 
                     // 2. MONTAGEM DO JSON
                     const payload = {
@@ -112,7 +116,7 @@ async function processarFila() {
                                             { type: "text", text: p_data },         // "data"
                                             { type: "text", text: p_hora },         // "hora"
                                             { type: "text", text: p_profissional }, // "médico"
-                                            { type: "text", text: p_unidade }       // "endereço"
+                                            { type: "text", text: p_unidade }       // "endereço" (tblEmpresa)
                                         ]
                                     }
                                 ]
