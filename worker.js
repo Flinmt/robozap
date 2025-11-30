@@ -47,7 +47,7 @@ async function processarFila() {
         pool = await sql.connect(dbConfig);
 
         // SELECIONA MENSAGENS PENDENTES (Apenas <> 'S')
-        // Alteração: Trazemos as colunas separadas da tblEmpresa, sem concatenar no SQL
+        // Correção: a.strHora em vez de w.strHora
         const querySelect = `
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
@@ -55,8 +55,8 @@ async function processarFila() {
                 CASE WHEN a.strAgenda='' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
                 w.intWhatsAppEnvioId, 
                 w.intAgendaId,
-                convert(varchar, w.datAgendamento, 103) as datagenda,
-                w.strHora,
+                convert(varchar, a.datAgendamento, 103) as datagenda, -- Garantindo que vem da View Agenda
+                a.strHora, -- CORRIGIDO: Coluna vem da vwAgenda (alias a), não da tabela de envio (w)
                 a.strProfissional,
                 -- TRAZENDO COLUNAS SEPARADAS PARA CONCATENAR NO NODE.JS:
                 E.strEndereco,
