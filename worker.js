@@ -111,7 +111,7 @@ async function processarFila() {
                     // 2. MONTAGEM DO JSON
                     const payload = {
                         number: telefoneFinal,
-                        isClosed: false,
+                        isClosed: true,
                         templateData: {
                             messaging_product: "whatsapp",
                             to: telefoneFinal,
