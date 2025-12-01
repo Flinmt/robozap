@@ -29,8 +29,8 @@ const dbConfig = {
 };
 
 // --- CONFIGURAÇÕES PARTNERBOT ---
-const PARTNERBOT_URL = 'https://painel.partnerbot.com.br/v2/api/external/de10bffc-f911-4d63-ac53-80b6648aa5d4/template';
-const AUTH_TOKEN = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6OSwicHJvZmlsZSI6ImFkbWluIiwic2Vzc2lvbklkIjo4OSwiaWF0IjoxNzY0MzY2NzI1LCJleHAiOjE4Mjc0Mzg3MjV9.GC18WTtV-nqwQCV9b0GbJsx1dvW2RuHeTbwuy-CDCow';
+const PARTNERBOT_URL = 'https://painel.partnerbot.com.br/v2/api/external/3b01a3ae-55b3-4ca0-91b1-230751fde7a5/template';
+const AUTH_TOKEN = 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZW5hbnRJZCI6OSwicHJvZmlsZSI6ImFkbWluIiwic2Vzc2lvbklkIjo4OSwiaWF0IjoxNzY0NTkzNzg0LCJleHAiOjE4Mjc2NjU3ODR9.N5gn4itCqtqeXaxetrXHuqZXJ98XIMFy1xF_Hdek6RU';
 
 const INTERVALO_CHECK = 10000;
 
