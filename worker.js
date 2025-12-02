@@ -59,6 +59,7 @@ async function processarFila() {
                 a.strHora, -- CORRIGIDO: Coluna vem da vwAgenda (alias a), não da tabela de envio (w)
                 a.strProfissional,
                 -- TRAZENDO COLUNAS SEPARADAS PARA CONCATENAR NO NODE.JS:
+                E.strEmpresa,
                 E.strEndereco,
                 E.strNumero,
                 E.strBairro,
@@ -96,6 +97,7 @@ async function processarFila() {
                     const p_data = limparTexto(msg.datagenda);
                     const p_hora = limparTexto(msg.strHora);
                     const p_profissional = limparTexto(msg.strProfissional);
+                    const p_empresa = limparTexto(msg.strEmpresa);
 
                     // --- CONCATENAÇÃO FEITA AQUI NO JAVASCRIPT ---
                     // Pega os valores brutos ou usa padrão se vier nulo
@@ -106,7 +108,7 @@ async function processarFila() {
 
                     // Monta a string completa
                     const enderecoCompleto = `${end_rua}, ${end_num} - ${end_bairro} - ${end_uf}`;
-                    const p_unidade = limparTexto(enderecoCompleto); 
+                    const p_unidade = limparTexto(enderecoCompleto);
 
                     // 2. MONTAGEM DO JSON
                     const payload = {
@@ -117,7 +119,7 @@ async function processarFila() {
                             to: telefoneFinal,
                             type: "template",
                             template: {
-                                name: "confirma_nova",
+                                name: "novoagendamento_2",
                                 language: {
                                     code: "pt_BR"
                                 },
@@ -129,6 +131,7 @@ async function processarFila() {
                                             { type: "text", text: p_data },         // "data"
                                             { type: "text", text: p_hora },         // "hora"
                                             { type: "text", text: p_profissional }, // "médico"
+                                            { type: "text", text: p_empresa },      // "empresa"
                                             { type: "text", text: p_unidade }       // "endereço" (Concatenado no JS)
                                         ]
                                     }
