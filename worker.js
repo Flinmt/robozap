@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('O Robô do WhatsApp está rodando! 🤖 (Template: confirma_nova)');
+    res.send('O Robô do WhatsApp está rodando! 🤖');
 });
 
 app.listen(PORT, () => {
@@ -34,7 +34,6 @@ const AUTH_TOKEN = process.env.AUTH_TOKEN;
 
 const INTERVALO_CHECK = 10000;
 
-// Função para limpar texto (Remove aspas, quebras de linha e evita vazio)
 function limparTexto(texto) {
     if (texto === null || texto === undefined) return "-"; 
     const textoLimpo = String(texto).replace(/[\r\n"]/g, " ").trim();
@@ -46,8 +45,7 @@ async function processarFila() {
     try {
         pool = await sql.connect(dbConfig);
 
-        // SELECIONA MENSAGENS PENDENTES (Apenas <> 'S')
-        // Correção: a.strHora em vez de w.strHora
+        // QUERY ORIGINAL (Mantida conforme solicitado por enquanto)
         const querySelect = `
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
@@ -55,10 +53,9 @@ async function processarFila() {
                 CASE WHEN a.strAgenda='' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
                 w.intWhatsAppEnvioId, 
                 w.intAgendaId,
-                convert(varchar, a.datAgendamento, 103) as datagenda, -- Garantindo que vem da View Agenda
-                a.strHora, -- CORRIGIDO: Coluna vem da vwAgenda (alias a), não da tabela de envio (w)
+                convert(varchar, a.datAgendamento, 103) as datagenda,
+                a.strHora,
                 a.strProfissional,
-                -- TRAZENDO COLUNAS SEPARADAS PARA CONCATENAR NO NODE.JS:
                 E.strEmpresa,
                 E.strEndereco,
                 E.strNumero,
@@ -67,8 +64,8 @@ async function processarFila() {
                 dbo.fncBase64_Encode(CONVERT(VARCHAR, w.intagendaid) + '-' + CONVERT(VARCHAR, GETDATE(), 120)) AS Link
             from tblWhatsAppEnvio W
             inner join vwAgenda a on a.intAgendaId = w.intAgendaId
-            inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    -- 1. Pega a Agenda real
-            inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  -- 2. Pega a Empresa pelo ID da Unidade na Agenda
+            inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
+            inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  
             where IsNull(w.bolEnviado,'N') NOT IN ('S', 'E') 
             and w.strTipo = 'agendainicio' 
             and len(w.strTelefone) >= 10 
@@ -83,34 +80,32 @@ async function processarFila() {
             console.log(`🔍 Encontradas ${listaEnvio.length} mensagens.`);
             
             for (const msg of listaEnvio) {
+                // Definimos 'E' como padrão. Se der tudo certo, muda para 'S'.
+                let statusEnvio = 'E';
+                let obsErro = '';
+
                 try {
                     // 1. PREPARAÇÃO DOS DADOS
-                    const telefoneFinal = String(msg.strtelefone).replace(/\D/g, ""); // Só números
+                    const telefoneFinal = String(msg.strtelefone).replace(/\D/g, "");
                     
-                    // Validação de segurança do número
                     if (!telefoneFinal || telefoneFinal.length < 10) {
                          throw new Error(`Número inválido: '${telefoneFinal}'`);
                     }
 
-                    // Variáveis mapeadas
                     const p_agenda = limparTexto(msg.strAgenda);
                     const p_data = limparTexto(msg.datagenda);
                     const p_hora = limparTexto(msg.strHora);
                     const p_profissional = limparTexto(msg.strProfissional);
                     const p_empresa = limparTexto(msg.strEmpresa);
 
-                    // --- CONCATENAÇÃO FEITA AQUI NO JAVASCRIPT ---
-                    // Pega os valores brutos ou usa padrão se vier nulo
                     const end_rua = msg.strEndereco || '';
                     const end_num = msg.strNumero || 'S/N';
                     const end_bairro = msg.strBairro || '';
                     const end_uf = msg.strEstado || '';
-
-                    // Monta a string completa
                     const enderecoCompleto = `${end_rua}, ${end_num} - ${end_bairro} - ${end_uf}`;
                     const p_unidade = limparTexto(enderecoCompleto);
 
-                    // 2. MONTAGEM DO JSON
+                    // 2. MONTAGEM DO JSON (Mantido o original por enquanto)
                     const payload = {
                         number: telefoneFinal,
                         isClosed: true,
@@ -120,19 +115,17 @@ async function processarFila() {
                             type: "template",
                             template: {
                                 name: "novoagendamento_2",
-                                language: {
-                                    code: "pt_BR"
-                                },
+                                language: { code: "pt_BR" },
                                 components: [
                                     {
                                         type: "body",
                                         parameters: [
-                                            { type: "text", text: p_agenda },       // "paciente"
-                                            { type: "text", text: p_data },         // "data"
-                                            { type: "text", text: p_hora },         // "hora"
-                                            { type: "text", text: p_profissional }, // "médico"
-                                            { type: "text", text: p_empresa },      // "empresa"
-                                            { type: "text", text: p_unidade }       // "endereço" (Concatenado no JS)
+                                            { type: "text", text: p_agenda },
+                                            { type: "text", text: p_data },
+                                            { type: "text", text: p_hora },
+                                            { type: "text", text: p_profissional },
+                                            { type: "text", text: p_empresa },
+                                            { type: "text", text: p_unidade }
                                         ]
                                     }
                                 ]
@@ -142,31 +135,51 @@ async function processarFila() {
 
                     console.log(`📤 Enviando ID ${msg.intWhatsAppEnvioId} para ${telefoneFinal}...`);
                     
-                    // 3. ENVIO
-                    await axios.post(PARTNERBOT_URL, payload, {
-                        headers: { 'Content-Type': 'application/json', 'Authorization': AUTH_TOKEN }
+                    // 3. ENVIO COM VALIDAÇÃO DE STATUS
+                    // 'validateStatus: () => true' impede que o axios jogue erro em 400/500
+                    const response = await axios.post(PARTNERBOT_URL, payload, {
+                        headers: { 'Content-Type': 'application/json', 'Authorization': AUTH_TOKEN },
+                        validateStatus: () => true 
                     });
 
-                    // 4. ATUALIZAÇÃO (SUCESSO)
-                    // Agora enviamos o CONTEXT_INFO 0x123456 antes do UPDATE para passar pelo Trigger
-                    await pool.request()
-                        .input('id', sql.Int, msg.intWhatsAppEnvioId)
-                        .query(`
-                            SET CONTEXT_INFO 0x123456; 
-                            UPDATE tblWhatsAppEnvio SET bolEnviado = 'S' WHERE intWhatsAppEnvioId = @id
-                        `);
-                    
-                    console.log(`✅ Sucesso ID: ${msg.intWhatsAppEnvioId}`);
+                    // 4. VERIFICAÇÃO DO RETORNO (200 = S, Resto = E)
+                    if (response.status === 200) {
+                        statusEnvio = 'S';
+                        console.log(`✅ Sucesso ID: ${msg.intWhatsAppEnvioId} (Status 200)`);
+                    } else {
+                        statusEnvio = 'E';
+                        // Tenta pegar mensagem de erro da API se existir
+                        const detalheErro = JSON.stringify(response.data);
+                        obsErro = `API Status ${response.status}: ${detalheErro}`;
+                        console.error(`❌ Erro API ID ${msg.intWhatsAppEnvioId}: ${obsErro}`);
+                    }
 
                 } catch (errEnvio) {
-                    // 5. TRATAMENTO DE ERRO
-                    // NÃO ATUALIZA O BANCO (Mantém como 'N')
-                    let errorMsg = errEnvio.message;
-                    if (errEnvio.response && errEnvio.response.data) {
-                        try { errorMsg = JSON.stringify(errEnvio.response.data); } catch(e) {}
+                    // Erros de rede, timeout, ou falha no código de preparação
+                    statusEnvio = 'E';
+                    obsErro = errEnvio.message;
+                    console.error(`❌ Falha Crítica ID ${msg.intWhatsAppEnvioId}: ${obsErro}`);
+                }
+
+                // 5. ATUALIZAÇÃO NO BANCO (Agora acontece para S e para E)
+                try {
+                    await pool.request()
+                        .input('id', sql.Int, msg.intWhatsAppEnvioId)
+                        .input('status', sql.VarChar, statusEnvio) // Passamos a variável calculada
+                        .query(`
+                            SET CONTEXT_INFO 0x123456; 
+                            UPDATE tblWhatsAppEnvio 
+                            SET bolEnviado = @status 
+                            WHERE intWhatsAppEnvioId = @id
+                        `);
+                    
+                    // Se quiser, pode logar quando atualiza para E no banco
+                    if (statusEnvio === 'E') {
+                        console.log(`   -> Status atualizado para 'E' no banco.`);
                     }
-                    console.error(`❌ Falha ID ${msg.intWhatsAppEnvioId}: ${errorMsg}`);
-                    console.error(`   -> Mensagem mantida na fila (Status 'N').`);
+
+                } catch (errDb) {
+                    console.error(`⚠️ Erro ao atualizar banco ID ${msg.intWhatsAppEnvioId}: ${errDb.message}`);
                 }
             }
         }
@@ -178,4 +191,4 @@ async function processarFila() {
 }
 
 setInterval(processarFila, INTERVALO_CHECK);
-console.log("🚀 Robô Iniciado. Configuração: Template 'confirma_nova'.");
+console.log("🚀 Robô Iniciado. Validação de Status Ativa (200=S, Else=E).");
