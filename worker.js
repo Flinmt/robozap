@@ -67,7 +67,7 @@ async function processarFila() {
             from tblWhatsAppEnvio W
             inner join vwAgenda a on a.intAgendaId = w.intAgendaId
             inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    -- 1. Pega a Agenda real
-            inner join tblEmpresa E on E.intEmpresaId = TA.intEmpresaId  -- 2. Pega a Empresa pelo ID da Agenda
+            inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  -- 2. Pega a Empresa pelo ID da Unidade na Agenda
             where IsNull(w.bolEnviado,'N') NOT IN ('S', 'E') 
             and w.strTipo = 'agendainicio' 
             and len(w.strTelefone) >= 10 
