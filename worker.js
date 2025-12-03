@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/', (req, res) => {
-    res.send('O Robô do WhatsApp está rodando! 🤖 (Template: confirma_nova)');
+    res.send('O Robô do WhatsApp está rodando! 🤖');
 });
 
 app.listen(PORT, () => {
@@ -34,6 +34,10 @@ const AUTH_TOKEN = process.env.AUTH_TOKEN;
 
 const INTERVALO_CHECK = 10000;
 
+// --- [CORREÇÃO] VARIÁVEL DE CONTROLE DE FLUXO ---
+// Essa variável impede que uma nova execução comece se a anterior não terminou.
+let isProcessing = false; 
+
 // Função para limpar texto (Remove aspas, quebras de linha e evita vazio)
 function limparTexto(texto) {
     if (texto === null || texto === undefined) return "-"; 
@@ -42,12 +46,20 @@ function limparTexto(texto) {
 }
 
 async function processarFila() {
+    // --- [CORREÇÃO] TRAVA DE SEGURANÇA ---
+    if (isProcessing) {
+        console.log("⏳ O processo anterior ainda não terminou. Pulando este ciclo para evitar duplicidade...");
+        return;
+    }
+
+    // Ativa a trava
+    isProcessing = true;
+
     let pool;
     try {
         pool = await sql.connect(dbConfig);
 
         // SELECIONA MENSAGENS PENDENTES (Apenas <> 'S')
-        // Correção: a.strHora em vez de w.strHora
         const querySelect = `
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
@@ -55,10 +67,9 @@ async function processarFila() {
                 CASE WHEN a.strAgenda='' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
                 w.intWhatsAppEnvioId, 
                 w.intAgendaId,
-                convert(varchar, a.datAgendamento, 103) as datagenda, -- Garantindo que vem da View Agenda
-                a.strHora, -- CORRIGIDO: Coluna vem da vwAgenda (alias a), não da tabela de envio (w)
+                convert(varchar, a.datAgendamento, 103) as datagenda, 
+                a.strHora, 
                 a.strProfissional,
-                -- TRAZENDO COLUNAS SEPARADAS PARA CONCATENAR NO NODE.JS:
                 E.strEmpresa,
                 E.strEndereco,
                 E.strNumero,
@@ -67,12 +78,12 @@ async function processarFila() {
                 dbo.fncBase64_Encode(CONVERT(VARCHAR, w.intagendaid) + '-' + CONVERT(VARCHAR, GETDATE(), 120)) AS Link
             from tblWhatsAppEnvio W
             inner join vwAgenda a on a.intAgendaId = w.intAgendaId
-            inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    -- 1. Pega a Agenda real
-            inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  -- 2. Pega a Empresa pelo ID da Unidade na Agenda
+            inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
+            inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  
             where IsNull(w.bolEnviado,'N') NOT IN ('S', 'E') 
             and w.strTipo = 'agendainicio' 
             and len(w.strTelefone) >= 10 
-            AND CONVERT(DATE, w.datWhatsAppEnvio) = CONVERT(DATE, GETDATE())
+            and CONVERT(DATE, w.datWhatsAppEnvio) = CONVERT(DATE, GETDATE())
             order by w.datWhatsAppEnvio
         `;
 
@@ -89,7 +100,7 @@ async function processarFila() {
                     
                     // Validação de segurança do número
                     if (!telefoneFinal || telefoneFinal.length < 10) {
-                         throw new Error(`Número inválido: '${telefoneFinal}'`);
+                          throw new Error(`Número inválido: '${telefoneFinal}'`);
                     }
 
                     // Variáveis mapeadas
@@ -99,14 +110,12 @@ async function processarFila() {
                     const p_profissional = limparTexto(msg.strProfissional);
                     const p_empresa = limparTexto(msg.strEmpresa);
 
-                    // --- CONCATENAÇÃO FEITA AQUI NO JAVASCRIPT ---
-                    // Pega os valores brutos ou usa padrão se vier nulo
+                    // Concatenação de endereço
                     const end_rua = msg.strEndereco || '';
                     const end_num = msg.strNumero || 'S/N';
                     const end_bairro = msg.strBairro || '';
                     const end_uf = msg.strEstado || '';
 
-                    // Monta a string completa
                     const enderecoCompleto = `${end_rua}, ${end_num} - ${end_bairro} - ${end_uf}`;
                     const p_unidade = limparTexto(enderecoCompleto);
 
@@ -120,19 +129,17 @@ async function processarFila() {
                             type: "template",
                             template: {
                                 name: "novoagendamento_2",
-                                language: {
-                                    code: "pt_BR"
-                                },
+                                language: { code: "pt_BR" },
                                 components: [
                                     {
                                         type: "body",
                                         parameters: [
-                                            { type: "text", text: p_agenda },       // "paciente"
-                                            { type: "text", text: p_data },         // "data"
-                                            { type: "text", text: p_hora },         // "hora"
-                                            { type: "text", text: p_profissional }, // "médico"
-                                            { type: "text", text: p_empresa },      // "empresa"
-                                            { type: "text", text: p_unidade }       // "endereço" (Concatenado no JS)
+                                            { type: "text", text: p_agenda },       
+                                            { type: "text", text: p_data },         
+                                            { type: "text", text: p_hora },         
+                                            { type: "text", text: p_profissional }, 
+                                            { type: "text", text: p_empresa },      
+                                            { type: "text", text: p_unidade }       
                                         ]
                                     }
                                 ]
@@ -148,7 +155,6 @@ async function processarFila() {
                     });
 
                     // 4. ATUALIZAÇÃO (SUCESSO)
-                    // Agora enviamos o CONTEXT_INFO 0x123456 antes do UPDATE para passar pelo Trigger
                     await pool.request()
                         .input('id', sql.Int, msg.intWhatsAppEnvioId)
                         .query(`
@@ -159,8 +165,7 @@ async function processarFila() {
                     console.log(`✅ Sucesso ID: ${msg.intWhatsAppEnvioId}`);
 
                 } catch (errEnvio) {
-                    // 5. TRATAMENTO DE ERRO
-                    // NÃO ATUALIZA O BANCO (Mantém como 'N')
+                    // 5. TRATAMENTO DE ERRO DE ENVIO INDIVIDUAL
                     let errorMsg = errEnvio.message;
                     if (errEnvio.response && errEnvio.response.data) {
                         try { errorMsg = JSON.stringify(errEnvio.response.data); } catch(e) {}
@@ -174,8 +179,12 @@ async function processarFila() {
         console.error("⚠️ Erro Geral:", err.message);
     } finally {
         if (pool) pool.close();
+        
+        // --- [CORREÇÃO] LIBERA A TRAVA ---
+        // Importante: Isso roda mesmo se der erro, permitindo a próxima execução.
+        isProcessing = false;
     }
 }
 
 setInterval(processarFila, INTERVALO_CHECK);
-console.log("🚀 Robô Iniciado. Configuração: Template 'confirma_nova'.");
+console.log("🚀 Robô Iniciado.");
