@@ -1,0 +1,60 @@
+/**
+ * Remove quebras de linha, aspas e retorna "-" se for vazio/nulo.
+ * @param {string} texto 
+ * @returns {string}
+ */
+function limparTexto(texto) {
+    if (texto === null || texto === undefined) return "-";
+    const textoLimpo = String(texto).replace(/[\r\n"]/g, " ").trim();
+    return textoLimpo === "" ? "-" : textoLimpo;
+}
+
+/**
+ * Remove caracteres não numéricos.
+ * @param {string} telefone 
+ * @returns {string}
+ */
+function limparTelefone(telefone) {
+    return String(telefone).replace(/\D/g, "");
+}
+
+/**
+ * Monta o payload JSON para a API do PartnerBot.
+ * @param {string} telefoneFinal 
+ * @param {object} dados - Objeto com os campos p_agenda, p_data, etc.
+ * @returns {object}
+ */
+function montarPayloadAgendamento(telefoneFinal, dados) {
+    return {
+        number: telefoneFinal,
+        isClosed: true,
+        templateData: {
+            messaging_product: "whatsapp",
+            to: telefoneFinal,
+            type: "template",
+            template: {
+                name: "novoagendamento_2",
+                language: { code: "pt_BR" },
+                components: [
+                    {
+                        type: "body",
+                        parameters: [
+                            { type: "text", text: dados.p_agenda },
+                            { type: "text", text: dados.p_data },
+                            { type: "text", text: dados.p_hora },
+                            { type: "text", text: dados.p_profissional },
+                            { type: "text", text: dados.p_empresa },
+                            { type: "text", text: dados.p_unidade }
+                        ]
+                    }
+                ]
+            }
+        }
+    };
+}
+
+module.exports = {
+    limparTexto,
+    limparTelefone,
+    montarPayloadAgendamento
+};

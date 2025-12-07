@@ -2,9 +2,10 @@
   "name": "robo-whatsapp-sql",
   "version": "1.0.0",
   "description": "Worker para envio de WhatsApp via SQL Server",
-  "main": "worker.js",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node worker.js"
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
   },
   "dependencies": {
     "axios": "^1.13.2",
@@ -26,5 +27,8 @@
   "bugs": {
     "url": "https://github.com/Flinmt/ROBOZAP/issues"
   },
-  "homepage": "https://github.com/Flinmt/ROBOZAP#readme"
+  "homepage": "https://github.com/Flinmt/ROBOZAP#readme",
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
 }
