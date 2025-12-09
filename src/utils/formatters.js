@@ -33,7 +33,7 @@ function montarPayloadAgendamento(telefoneFinal, dados) {
             to: telefoneFinal,
             type: "template",
             template: {
-                name: "novoagendamento_2",
+                name: process.env.TEMPLATE_NEW_SCHEDULE,
                 language: { code: "pt_BR" },
                 components: [
                     {
@@ -69,7 +69,7 @@ function montarPayloadConfirmacao(telefoneFinal, dados, link) {
             to: telefoneFinal,
             type: "template",
             template: {
-                name: "templatelembretev2",
+                name: process.env.TEMPLATE_REMINDER,
                 language: { code: "pt_BR" },
                 components: [
                     {

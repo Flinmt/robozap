@@ -5,6 +5,7 @@ const database = require('./config/database');
 const MessageRepository = require('./repositories/messageRepository');
 const PartnerBotService = require('./services/partnerBotService');
 const formatters = require('./utils/formatters');
+const logger = require('./utils/logger');
 
 // ==========================================
 // 1. CONFIGURAÇÃO (INSTANCIAMENTO)
@@ -13,7 +14,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const PARTNERBOT_URL = process.env.URL;
 const AUTH_TOKEN = process.env.AUTH_TOKEN;
+const COMPANY_NAME = process.env.COMPANY_NAME || null;
 const INTERVALO_CHECK = 10000;
+
+if (COMPANY_NAME) {
+    logger.info(`🏢 Worker configurado para a empresa: ${COMPANY_NAME}`);
+} else {
+    logger.info(`🌍 Worker rodando para TODAS as empresas (Modo Global)`);
+}
 
 // Serviço de envio (Stateful, configurado uma vez)
 const botService = new PartnerBotService(PARTNERBOT_URL, AUTH_TOKEN);
@@ -25,14 +33,14 @@ let isProcessing = false;
 // 2. SERVIDOR WEB (HEALTH CHECK)
 // ==========================================
 app.get('/', (req, res) => res.send('O Robô do WhatsApp está rodando! 🤖'));
-app.listen(PORT, () => console.log(`✅ Servidor Web monitorando na porta ${PORT}`));
+app.listen(PORT, () => logger.info(`✅ Servidor Web monitorando na porta ${PORT}`));
 
 // ==========================================
 // 3. LOGICA PRINCIPAL (WORKER)
 // ==========================================
 async function processarFila() {
     if (isProcessing) {
-        console.log("⏳ Aguardando ciclo anterior...");
+        logger.info("⏳ Aguardando ciclo anterior...");
         return;
     }
     isProcessing = true;
@@ -48,7 +56,7 @@ async function processarFila() {
         const mensagens = await repository.buscarMensagensPendentes();
 
         if (mensagens.length > 0) {
-            console.log(`🔍 Encontradas ${mensagens.length} novas mensagens.`);
+            logger.info(`🔍 Encontradas ${mensagens.length} novas mensagens.`);
 
             for (const msg of mensagens) {
                 try {
@@ -70,23 +78,23 @@ async function processarFila() {
 
                     const payload = formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados);
 
-                    console.log(`📤 Enviando Agendamento ID ${msg.intWhatsAppEnvioId}...`);
+                    logger.info(`📤 Enviando Agendamento ID ${msg.intWhatsAppEnvioId}...`);
 
                     // Enviar
                     await botService.enviarMensagem(payload);
 
                     // Atualizar Sucesso
                     await repository.marcarComoEnviado(msg.intWhatsAppEnvioId);
-                    console.log(`✅ Sucesso Agendamento ID: ${msg.intWhatsAppEnvioId}`);
+                    logger.info(`✅ Sucesso Agendamento ID: ${msg.intWhatsAppEnvioId}`);
 
                 } catch (error) {
-                    console.error(`❌ Falha Agendamento ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
+                    logger.error(`❌ Falha Agendamento ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
 
                     // Atualizar Erro
                     try {
                         await repository.marcarComoErro(msg.intWhatsAppEnvioId);
                     } catch (dbErr) {
-                        console.error(`   -> CRÍTICO: Falha ao marcar erro no banco: ${dbErr.message}`);
+                        logger.error(`   -> CRÍTICO: Falha ao marcar erro no banco: ${dbErr.message}`);
                     }
                 }
             }
@@ -98,7 +106,7 @@ async function processarFila() {
         const confirmacoes = await repository.buscarConfirmacoesPendentes();
 
         if (confirmacoes.length > 0) {
-            console.log(`🔔 Encontrados ${confirmacoes.length} lembretes para enviar.`);
+            logger.info(`🔔 Encontrados ${confirmacoes.length} lembretes para enviar.`);
 
             for (const msg of confirmacoes) {
                 try {
@@ -122,26 +130,26 @@ async function processarFila() {
 
                     const payload = formatters.montarPayloadConfirmacao(telefoneFinal, dadosFormatados, linkBotao);
 
-                    console.log(`📤 Enviando Lembrete ID ${msg.intWhatsAppEnvioId}...`);
+                    logger.info(`📤 Enviando Lembrete ID ${msg.intWhatsAppEnvioId}...`);
 
                     await botService.enviarMensagem(payload);
 
                     await repository.marcarConfirmacaoComoEnviada(msg.intWhatsAppEnvioId);
-                    console.log(`✅ Lembrete enviado ID: ${msg.intWhatsAppEnvioId}`);
+                    logger.info(`✅ Lembrete enviado ID: ${msg.intWhatsAppEnvioId}`);
 
                 } catch (error) {
-                    console.error(`❌ Falha Lembrete ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
+                    logger.error(`❌ Falha Lembrete ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
                     try {
                         await repository.marcarComoErro(msg.intWhatsAppEnvioId);
                     } catch (dbErr) {
-                        console.error(`   -> DB Err: ${dbErr.message}`);
+                        logger.error(`   -> DB Err: ${dbErr.message}`);
                     }
                 }
             }
         }
 
     } catch (err) {
-        console.error("⚠️ Erro Geral:", err.message);
+        logger.error(`⚠️ Erro Geral: ${err.message}`);
     } finally {
         if (pool) pool.close();
         isProcessing = false;
@@ -150,4 +158,4 @@ async function processarFila() {
 
 // Inicia
 setInterval(processarFila, INTERVALO_CHECK);
-console.log("🚀 Worker Modular Iniciado.");
+logger.info("🚀 Worker Modular Iniciado.");
