@@ -74,3 +74,82 @@ Para rodar localmente:
 1. `npm install`
 2. Crie um arquivo `.env` na raiz.
 3. `npm start` ou `npm run dev` (com nodemon).
+
+---
+
+# ROBOZAP - WhatsApp/SQL Server Integration Worker
+
+Modular Node.js worker responsible for reading appointment data from a SQL Server database and sending WhatsApp messages via the PartnerBot API.
+
+The system was designed to operate in **multiple containers**, allowing you to serve multiple companies simultaneously ("One Container, One Database"), ensuring isolation and scalability.
+
+## 🚀 Features
+
+- **Welcome Message**: Processes new appointments created during the day and sends confirmation.
+- **Agenda Confirmation**: Automatically sends reminders 1 day before the appointment.
+- **Structured Logging**: Colored logs in the console and JSON files (`logs/app.log`, `logs/error.log`) for easy monitoring.
+- **Multi-Tenant via Docker**: Native support for multiple containers running in parallel, each connected to a distinct database.
+
+## 🛠️ Configuration
+
+The worker is fully configured via environment variables.
+
+### Required Variables
+
+| Variable | Description | Example |
+|----------|-----------|---------|
+| `PORT` | Health Check server port | `3000` |
+| `COMPANY_NAME` | Company name (for log identification) | `My Clinic` |
+| `DB_SERVER` | SQL Server Address | `192.168.1.100` |
+| `DB_NAME` | Database Name | `db_clinic` |
+| `DB_USER` | Database User | `sa` |
+| `DB_PASSWORD` | Database Password | `password123` |
+| `URL` | PartnerBot API Endpoint | `https://api.partnerbot...` |
+| `AUTH_TOKEN` | PartnerBot API Token | `your_token_here` |
+| `TEMPLATE_NEW_SCHEDULE` | New appointment template name | `novoagendamento_2` |
+| `TEMPLATE_REMINDER` | Reminder template name | `templatelembretev2` |
+
+## 🐳 How to Run (Docker)
+
+The recommended strategy is to run a separate container for each company you serve.
+
+### 1. Build the Image
+```bash
+docker build -t robozap-worker .
+```
+
+### 2. Create Configuration Files
+Create a `.env` file for each client (e.g., `.env.clientA`, `.env.clientB`) filling in the variables listed above with that client's specific data.
+
+### 3. Start the Containers
+Run the command below to start the workers:
+
+```bash
+# Worker for Client A
+docker run -d \
+  --name worker-client-a \
+  --env-file .env.clientA \
+  --restart always \
+  robozap-worker
+
+# Worker for Client B
+docker run -d \
+  --name worker-client-b \
+  --env-file .env.clientB \
+  --restart always \
+  robozap-worker
+```
+
+## 📝 Logs
+
+The system generates logs in the `/usr/src/app/logs` directory inside the container.
+
+- **Console**: Formatted and colored logs (visible via `docker logs worker-client-a`).
+- **File**: Logs in JSON format for integration with monitoring systems.
+
+## 📦 Development
+
+To run locally:
+1. `npm install`
+2. Create a `.env` file in the root.
+3. `npm start` or `npm run dev` (with nodemon).
