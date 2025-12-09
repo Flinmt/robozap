@@ -53,8 +53,53 @@ function montarPayloadAgendamento(telefoneFinal, dados) {
     };
 }
 
+/**
+ * Monta o payload JSON para a mensagem de lembrete/confirmação.
+ * @param {string} telefoneFinal 
+ * @param {object} dados - Objeto com os campos formateados.
+ * @param {string} link - URL para o botão.
+ * @returns {object}
+ */
+function montarPayloadConfirmacao(telefoneFinal, dados, link) {
+    return {
+        number: telefoneFinal,
+        isClosed: true,
+        templateData: {
+            messaging_product: "whatsapp",
+            to: telefoneFinal,
+            type: "template",
+            template: {
+                name: "templatelembretev2",
+                language: { code: "pt_BR" },
+                components: [
+                    {
+                        type: "body",
+                        parameters: [
+                            { type: "text", text: dados.p_agenda },
+                            { type: "text", text: dados.p_data },
+                            { type: "text", text: dados.p_hora },
+                            { type: "text", text: dados.p_profissional },
+                            { type: "text", text: dados.p_empresa },
+                            { type: "text", text: dados.p_unidade }
+                        ]
+                    },
+                    {
+                        type: "button",
+                        sub_type: "url",
+                        index: "0",
+                        parameters: [
+                            { type: "text", text: link }
+                        ]
+                    }
+                ]
+            }
+        }
+    };
+}
+
 module.exports = {
     limparTexto,
     limparTelefone,
-    montarPayloadAgendamento
+    montarPayloadAgendamento,
+    montarPayloadConfirmacao
 };

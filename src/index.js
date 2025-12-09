@@ -42,15 +42,17 @@ async function processarFila() {
         pool = await database.connect();
         const repository = new MessageRepository(pool);
 
-        // [PASSO 1] Buscar
+        // ============================================================
+        // [ETAPA 1] ENVIO DE NOVOS AGENDAMENTOS (BOAS-VINDAS)
+        // ============================================================
         const mensagens = await repository.buscarMensagensPendentes();
 
         if (mensagens.length > 0) {
-            console.log(`🔍 Encontradas ${mensagens.length} mensagens.`);
+            console.log(`🔍 Encontradas ${mensagens.length} novas mensagens.`);
 
             for (const msg of mensagens) {
                 try {
-                    // [PASSO 2] Validar e Formatar
+                    // Validar e Formatar
                     const telefoneFinal = formatters.limparTelefone(msg.strtelefone);
 
                     if (!telefoneFinal || telefoneFinal.length < 10) {
@@ -68,19 +70,19 @@ async function processarFila() {
 
                     const payload = formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados);
 
-                    console.log(`📤 Enviando ID ${msg.intWhatsAppEnvioId}...`);
+                    console.log(`📤 Enviando Agendamento ID ${msg.intWhatsAppEnvioId}...`);
 
-                    // [PASSO 3] Enviar
+                    // Enviar
                     await botService.enviarMensagem(payload);
 
-                    // [PASSO 4] Atualizar Sucesso
+                    // Atualizar Sucesso
                     await repository.marcarComoEnviado(msg.intWhatsAppEnvioId);
-                    console.log(`✅ Sucesso ID: ${msg.intWhatsAppEnvioId}`);
+                    console.log(`✅ Sucesso Agendamento ID: ${msg.intWhatsAppEnvioId}`);
 
                 } catch (error) {
-                    console.error(`❌ Falha ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
+                    console.error(`❌ Falha Agendamento ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
 
-                    // [PASSO 5] Atualizar Erro
+                    // Atualizar Erro
                     try {
                         await repository.marcarComoErro(msg.intWhatsAppEnvioId);
                     } catch (dbErr) {
@@ -89,6 +91,55 @@ async function processarFila() {
                 }
             }
         }
+
+        // ============================================================
+        // [ETAPA 2] ENVIO DE LEMBRETES/CONFIRMAÇÃO (DIA ANTERIOR)
+        // ============================================================
+        const confirmacoes = await repository.buscarConfirmacoesPendentes();
+
+        if (confirmacoes.length > 0) {
+            console.log(`🔔 Encontrados ${confirmacoes.length} lembretes para enviar.`);
+
+            for (const msg of confirmacoes) {
+                try {
+                    const telefoneFinal = formatters.limparTelefone(msg.strtelefone);
+
+                    if (!telefoneFinal || telefoneFinal.length < 10) {
+                        throw new Error(`Número inválido: '${telefoneFinal}'`);
+                    }
+
+                    const dadosFormatados = {
+                        p_agenda: formatters.limparTexto(msg.strAgenda),
+                        p_data: formatters.limparTexto(msg.datagenda),
+                        p_hora: formatters.limparTexto(msg.strHora),
+                        p_profissional: formatters.limparTexto(msg.strProfissional),
+                        p_empresa: formatters.limparTexto(msg.strEmpresa),
+                        p_unidade: formatters.limparTexto(`${msg.strEndereco || ''}, ${msg.strNumero || 'S/N'} - ${msg.strBairro || ''} - ${msg.strEstado || ''}`)
+                    };
+
+                    // Link para o botão (conteúdo da coluna Link)
+                    const linkBotao = msg.Link || '-';
+
+                    const payload = formatters.montarPayloadConfirmacao(telefoneFinal, dadosFormatados, linkBotao);
+
+                    console.log(`📤 Enviando Lembrete ID ${msg.intWhatsAppEnvioId}...`);
+
+                    await botService.enviarMensagem(payload);
+
+                    await repository.marcarConfirmacaoComoEnviada(msg.intWhatsAppEnvioId);
+                    console.log(`✅ Lembrete enviado ID: ${msg.intWhatsAppEnvioId}`);
+
+                } catch (error) {
+                    console.error(`❌ Falha Lembrete ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
+                    try {
+                        await repository.marcarComoErro(msg.intWhatsAppEnvioId);
+                    } catch (dbErr) {
+                        console.error(`   -> DB Err: ${dbErr.message}`);
+                    }
+                }
+            }
+        }
+
     } catch (err) {
         console.error("⚠️ Erro Geral:", err.message);
     } finally {

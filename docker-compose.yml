@@ -8,3 +8,14 @@ services:
       - .env
     environment:
       - PORT=3000
+    container_name: worker-geral
+
+  # Exemplo de worker adicional (descomente e configure)
+  # worker-empresa-a:
+  #   build: .
+  #   restart: always
+  #   env_file: .env
+  #   environment:
+  #     - COMPANY_NAME=EmpresaA
+  #     - PORT=3001 # Se precisar expor porta diferente
+  #   container_name: worker-empresa-a
