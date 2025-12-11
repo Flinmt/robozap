@@ -52,16 +52,18 @@ class MessageRepository {
                 convert(varchar, a.datAgendamento, 103) as datagenda, 
                 a.strHora, 
                 a.strProfissional,
-                E.strEmpresa,
-                E.strEndereco,
-                E.strNumero,
-                E.strBairro,
-                E.strEstado,
+                ISNULL(strUnidade, 'Av. Júlia Rodrigues Torres 855 - Floresta, Belo Jardim - PE, CEP:55150-000') AS strEmpresa, -- Using strEmpresa alias to match potential usage, or strunidade if better
+                -- Original query selected separated address fields. 
+                -- To match formatters.js usage for confirmation, we previously constructed "strEndereco...".
+                -- Let's provide the same keys expected by index.js -> formatters.js
+                 'Av. Júlia Rodrigues Torres' as strEndereco,
+                 '855' as strNumero,
+                 'Floresta' as strBairro,
+                 'PE' as strEstado,
+
                 dbo.fncBase64_Encode(CONVERT(VARCHAR, w.intagendaid) + '-' + CONVERT(VARCHAR, GETDATE(), 120)) AS Link
             from tblWhatsAppEnvio W
             inner join vwAgenda a on a.intAgendaId = w.intAgendaId
-            inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
-            inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  
             where IsNull(w.bolConfirma,'N') NOT IN ('S')
             and IsNull(w.bolEnviado,'S') NOT IN ('N')
             and w.bolMensagemErro = 0

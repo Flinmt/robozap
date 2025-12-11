@@ -27,7 +27,7 @@ function limparTelefone(telefone) {
 function montarPayloadAgendamento(telefoneFinal, dados) {
     return {
         number: telefoneFinal,
-        isClosed: true,
+        isClosed: false,
         templateData: {
             messaging_product: "whatsapp",
             to: telefoneFinal,
