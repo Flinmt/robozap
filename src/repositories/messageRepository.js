@@ -7,31 +7,35 @@ class MessageRepository {
 
     async buscarMensagensPendentes() {
         const querySelect = `
-            SELECT top 20
-                '55' + w.strTelefone as strtelefone,
-                w.strTipo,
-                CASE WHEN a.strAgenda='' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
-                w.intWhatsAppEnvioId, 
-                w.intAgendaId,
-                convert(varchar, a.datAgendamento, 103) as datagenda, 
-                a.strHora, 
+            SELECT TOP 20
+                '55' + w.strTelefone AS strtelefone,
+                CONVERT(NVARCHAR(2000), strWhatsAppEnvio) AS strMensagem,
+                strTipo,
+                
+                CASE 
+                    WHEN a.strAgenda = '' THEN W.strAgenda 
+                    ELSE a.strAgenda 
+                END AS strAgenda,
+                
+                intWhatsAppEnvioId, 
+                W.intAgendaId,
+                CONVERT(VARCHAR, datAgendamento, 103) AS datagenda,
+                strHora,
                 a.strProfissional,
-                E.strEmpresa,
-                E.strEndereco,
-                E.strNumero,
-                E.strBairro,
-                E.strEstado,
+                
+                ISNULL(strUnidade, 'Av. Júlia Rodrigues Torres 855 - Floresta, Belo Jardim - PE, CEP:55150-000') AS strunidade,
+                
                 dbo.fncBase64_Encode(CONVERT(VARCHAR, w.intagendaid) + '-' + CONVERT(VARCHAR, GETDATE(), 120)) AS Link
-            from tblWhatsAppEnvio W
-            inner join vwAgenda a on a.intAgendaId = w.intAgendaId
-            inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
-            inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  
-            where IsNull(w.bolEnviado,'N') NOT IN ('S') 
-            and w.bolMensagemErro = 0
-            and w.strTipo = 'agendainicio' 
-            and len(w.strTelefone) >= 10 
-            and CONVERT(DATE, w.datWhatsAppEnvio) = CONVERT(DATE, GETDATE())
-            order by w.datWhatsAppEnvio
+            
+            FROM tblWhatsAppEnvio W
+            INNER JOIN vwAgenda a ON a.intAgendaId = w.intAgendaId
+            
+            WHERE ISNULL(bolEnviado, 'N') <> 'S' 
+              AND strTipo IN ('agenda', 'agendainicio', 'Cadencia')
+              AND LEN(W.strTelefone) >= 10 
+              AND CONVERT(DATE, datWhatsAppEnvio) = CONVERT(DATE, GETDATE())
+            
+            ORDER BY datWhatsAppEnvio
         `;
 
         const result = await this.pool.request().query(querySelect);

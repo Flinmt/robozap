@@ -73,7 +73,7 @@ async function processarFila() {
                         p_hora: formatters.limparTexto(msg.strHora),
                         p_profissional: formatters.limparTexto(msg.strProfissional),
                         p_empresa: formatters.limparTexto(msg.strEmpresa),
-                        p_unidade: formatters.limparTexto(`${msg.strEndereco || ''}, ${msg.strNumero || 'S/N'} - ${msg.strBairro || ''} - ${msg.strEstado || ''}`)
+                        p_unidade: formatters.limparTexto(msg.strunidade)
                     };
 
                     const payload = formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados);
