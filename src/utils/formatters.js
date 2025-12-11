@@ -43,7 +43,6 @@ function montarPayloadAgendamento(telefoneFinal, dados) {
                             { type: "text", text: dados.p_data },
                             { type: "text", text: dados.p_hora },
                             { type: "text", text: dados.p_profissional },
-                            { type: "text", text: dados.p_empresa },
                             { type: "text", text: dados.p_unidade }
                         ]
                     }
@@ -79,7 +78,6 @@ function montarPayloadConfirmacao(telefoneFinal, dados, link) {
                             { type: "text", text: dados.p_data },
                             { type: "text", text: dados.p_hora },
                             { type: "text", text: dados.p_profissional },
-                            { type: "text", text: dados.p_empresa },
                             { type: "text", text: dados.p_unidade }
                         ]
                     },
