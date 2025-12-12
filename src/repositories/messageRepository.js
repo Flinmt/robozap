@@ -30,7 +30,7 @@ class MessageRepository {
             and w.bolMensagemErro = 0
             and w.strTipo = 'agendainicio' 
             and len(w.strTelefone) >= 10 
-            and CONVERT(DATE, w.datWhatsAppEnvio) = CONVERT(DATE, GETDATE())
+            and CONVERT(DATE, w.datWhatsAppEnvio) <= CONVERT(DATE, GETDATE())
             order by w.datWhatsAppEnvio
         `;
 
