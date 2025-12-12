@@ -30,8 +30,8 @@ class MessageRepository {
             and w.bolMensagemErro = 0
             and w.strTipo = 'agendainicio' 
             and len(w.strTelefone) >= 10 
-            and CONVERT(DATE, w.datWhatsAppEnvio) <= CONVERT(DATE, GETDATE())
-            order by w.datWhatsAppEnvio
+            and CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE())
+            order by a.datAgendamento
         `;
 
         const result = await this.pool.request().query(querySelect);
@@ -64,7 +64,7 @@ class MessageRepository {
             and len(w.strTelefone) >= 10 
             -- Regra: Enviar 1 dia antes do agendamento
             and CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE() + 1)
-            order by w.datWhatsAppEnvio
+            order by a.datAgendamento
         `;
 
         const result = await this.pool.request().query(querySelect);
