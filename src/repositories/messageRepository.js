@@ -24,6 +24,7 @@ class MessageRepository {
                 a.strProfissional,
                 a.strEspecialidadeMedica,
                 a.strEmpresa as nomeUnidade,
+                a.bolAtendeHoraMarcada,
                 
                 ISNULL(strUnidade, 'Av. Júlia Rodrigues Torres 855 - Floresta, Belo Jardim - PE, CEP:55150-000') AS strunidade,
                 
@@ -56,6 +57,7 @@ class MessageRepository {
                 a.strProfissional,
                 a.strEspecialidadeMedica,
                 a.strEmpresa as nomeUnidade,
+                a.bolAtendeHoraMarcada,
                 
                 -- Original query selected separated address fields. 
                 -- To match formatters.js usage for confirmation, we previously constructed "strEndereco...".

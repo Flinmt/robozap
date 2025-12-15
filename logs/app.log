@@ -408,3 +408,81 @@
 {"level":"info","message":"📤 Enviando Agendamento ID 2861...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:07:25"}
 {"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:07:25"}
 {"level":"info","message":"✅ Sucesso Agendamento ID: 2861","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:07:31"}
+{"level":"info","message":"🌍 Worker rodando para TODAS as empresas (Modo Global)","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:10"}
+{"level":"info","message":"🚀 Worker Modular Iniciado.","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:10"}
+{"level":"info","message":"✅ Servidor Web monitorando na porta 3001","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:10"}
+{"level":"info","message":"🔍 Encontradas 16 novas mensagens.","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:22"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2862...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:22"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:22"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2862","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:28"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2863...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:28"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:28"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:30"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2863","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:34"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2864...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:34"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:34"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2864","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:39"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2865...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:39"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:39"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:40"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2865","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:45"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2866...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:45"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:45"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2866","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:50"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2867...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:50"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:50"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:50"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2867","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:55"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2868...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:55"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:42:55"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:00"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2868","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:01"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2869...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:01"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:01"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2869","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:06"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2870...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:06"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:06"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:10"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2870","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:11"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2871...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:11"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:11"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2871","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:16"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2872...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:16"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:16"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:20"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2872","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:22"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2873...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:22"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:22"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2873","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:27"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2874...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:27"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:27"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:30"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2874","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:32"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2875...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:32"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:32"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2875","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:38"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2876...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:38"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:38"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:40"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2876","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:43"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2877...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:43"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:43"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2877","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:49"}
+{"level":"info","message":"🔔 Encontrados 1 lembretes para enviar.","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:49"}
+{"level":"info","message":"📤 Enviando Lembrete ID 2877...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:49"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:49"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:50"}
+{"level":"info","message":"✅ Lembrete enviado ID: 2877","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:43:54"}
+{"level":"info","message":"🔍 Encontradas 1 novas mensagens.","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:45:12"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2878...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:45:12"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:45:12"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2878","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:45:18"}
+{"level":"info","message":"🔔 Encontrados 1 lembretes para enviar.","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:45:18"}
+{"level":"info","message":"📤 Enviando Lembrete ID 2878...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:45:18"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:45:18"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:45:20"}
+{"level":"info","message":"✅ Lembrete enviado ID: 2878","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:45:23"}
+{"level":"info","message":"🔍 Encontradas 1 novas mensagens.","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:47:12"}
+{"level":"info","message":"📤 Enviando Agendamento ID 2879...","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:47:12"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:47:12"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 2879","service":"robo-whatsapp-worker","timestamp":"2025-12-15 11:47:18"}

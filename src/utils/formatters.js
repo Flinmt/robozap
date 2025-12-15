@@ -10,6 +10,42 @@ function limparTexto(texto) {
 }
 
 /**
+ * Formata o horário. Se bolAtendeHoraMarcada for 'N', retorna "Turno - Por Ordem de Chegada".
+ * @param {string} horario 
+ * @param {string} bolAtendeHoraMarcada 
+ * @returns {string}
+ */
+function formatarHorario(horario, bolAtendeHoraMarcada) {
+    // Se "S" (Sim) ou nulo/indefinido (assalume sim para manter compatibilidade), retorna o horário normal (limpo)
+    if (!bolAtendeHoraMarcada || bolAtendeHoraMarcada.toUpperCase() === 'S') {
+        const limpo = limparTexto(horario);
+        return limpo;
+    }
+
+    // Se veio aqui, é 'N' -> Ordem de chegada
+    // Tenta extrair a hora
+    // Formato esperado: "HH:mm" ou "HH:mm:ss"
+    const horaLimpa = limparTexto(horario);
+    if (horaLimpa === '-') return "Por Ordem de Chegada"; // Fallback
+
+    const match = horaLimpa.match(/^(\d{1,2})/); // Pega o primeiro grupo de digitos
+    if (!match) return "Por Ordem de Chegada";
+
+    const horaInt = parseInt(match[1], 10);
+    let turno = "";
+
+    if (horaInt >= 0 && horaInt <= 11) {
+        turno = "Manhã";
+    } else if (horaInt >= 12 && horaInt <= 17) {
+        turno = "Tarde";
+    } else {
+        turno = "Noite";
+    }
+
+    return `${turno} - Por Ordem de Chegada`;
+}
+
+/**
  * Remove caracteres não numéricos.
  * @param {string} telefone 
  * @returns {string}
@@ -102,6 +138,7 @@ function montarPayloadConfirmacao(telefoneFinal, dados, link) {
 module.exports = {
     limparTexto,
     limparTelefone,
+    formatarHorario,
     montarPayloadAgendamento,
     montarPayloadConfirmacao
 };

@@ -70,7 +70,7 @@ async function processarFila() {
                     const dadosFormatados = {
                         p_agenda: formatters.limparTexto(msg.strAgenda),
                         p_data: formatters.limparTexto(msg.datagenda),
-                        p_hora: formatters.limparTexto(msg.strHora),
+                        p_hora: formatters.formatarHorario(msg.strHora, msg.bolAtendeHoraMarcada),
                         p_profissional: formatters.limparTexto(msg.strProfissional),
                         p_especialidade: formatters.limparTexto(msg.strEspecialidadeMedica),
                         p_nome_unidade: formatters.limparTexto(msg.nomeUnidade),
@@ -121,7 +121,7 @@ async function processarFila() {
                     const dadosFormatados = {
                         p_agenda: formatters.limparTexto(msg.strAgenda),
                         p_data: formatters.limparTexto(msg.datagenda),
-                        p_hora: formatters.limparTexto(msg.strHora),
+                        p_hora: formatters.formatarHorario(msg.strHora, msg.bolAtendeHoraMarcada),
                         p_profissional: formatters.limparTexto(msg.strProfissional),
                         p_especialidade: formatters.limparTexto(msg.strEspecialidadeMedica),
                         p_nome_unidade: formatters.limparTexto(msg.nomeUnidade),
