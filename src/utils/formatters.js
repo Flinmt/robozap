@@ -27,7 +27,7 @@ function limparTelefone(telefone) {
 function montarPayloadAgendamento(telefoneFinal, dados) {
     return {
         number: telefoneFinal,
-        isClosed: false,
+        isClosed: true,
         templateData: {
             messaging_product: "whatsapp",
             to: telefoneFinal,
@@ -43,6 +43,8 @@ function montarPayloadAgendamento(telefoneFinal, dados) {
                             { type: "text", text: dados.p_data },
                             { type: "text", text: dados.p_hora },
                             { type: "text", text: dados.p_profissional },
+                            { type: "text", text: dados.p_especialidade },
+                            { type: "text", text: dados.p_nome_unidade },
                             { type: "text", text: dados.p_unidade }
                         ]
                     }
@@ -78,6 +80,8 @@ function montarPayloadConfirmacao(telefoneFinal, dados, link) {
                             { type: "text", text: dados.p_data },
                             { type: "text", text: dados.p_hora },
                             { type: "text", text: dados.p_profissional },
+                            { type: "text", text: dados.p_especialidade },
+                            { type: "text", text: dados.p_nome_unidade },
                             { type: "text", text: dados.p_unidade }
                         ]
                     },

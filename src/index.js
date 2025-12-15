@@ -72,6 +72,8 @@ async function processarFila() {
                         p_data: formatters.limparTexto(msg.datagenda),
                         p_hora: formatters.limparTexto(msg.strHora),
                         p_profissional: formatters.limparTexto(msg.strProfissional),
+                        p_especialidade: formatters.limparTexto(msg.strEspecialidadeMedica),
+                        p_nome_unidade: formatters.limparTexto(msg.nomeUnidade),
                         p_empresa: formatters.limparTexto(msg.strEmpresa),
                         p_unidade: formatters.limparTexto(msg.strunidade)
                     };
@@ -121,6 +123,8 @@ async function processarFila() {
                         p_data: formatters.limparTexto(msg.datagenda),
                         p_hora: formatters.limparTexto(msg.strHora),
                         p_profissional: formatters.limparTexto(msg.strProfissional),
+                        p_especialidade: formatters.limparTexto(msg.strEspecialidadeMedica),
+                        p_nome_unidade: formatters.limparTexto(msg.nomeUnidade),
                         p_empresa: formatters.limparTexto(msg.strEmpresa),
                         p_unidade: formatters.limparTexto(`${msg.strEndereco || ''}, ${msg.strNumero || 'S/N'} - ${msg.strBairro || ''} - ${msg.strEstado || ''}`)
                     };

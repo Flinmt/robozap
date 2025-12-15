@@ -22,6 +22,8 @@ class MessageRepository {
                 CONVERT(VARCHAR, datAgendamento, 103) AS datagenda,
                 strHora,
                 a.strProfissional,
+                a.strEspecialidadeMedica,
+                a.strEmpresa as nomeUnidade,
                 
                 ISNULL(strUnidade, 'Av. Júlia Rodrigues Torres 855 - Floresta, Belo Jardim - PE, CEP:55150-000') AS strunidade,
                 
@@ -52,7 +54,9 @@ class MessageRepository {
                 convert(varchar, a.datAgendamento, 103) as datagenda, 
                 a.strHora, 
                 a.strProfissional,
-                ISNULL(strUnidade, 'Av. Júlia Rodrigues Torres 855 - Floresta, Belo Jardim - PE, CEP:55150-000') AS strEmpresa, -- Using strEmpresa alias to match potential usage, or strunidade if better
+                a.strEspecialidadeMedica,
+                a.strEmpresa as nomeUnidade,
+                
                 -- Original query selected separated address fields. 
                 -- To match formatters.js usage for confirmation, we previously constructed "strEndereco...".
                 -- Let's provide the same keys expected by index.js -> formatters.js
