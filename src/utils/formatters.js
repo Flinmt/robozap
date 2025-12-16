@@ -42,7 +42,7 @@ function formatarHorario(horario, bolAtendeHoraMarcada) {
         turno = "Noite";
     }
 
-    return `${turno} - Por Ordem de Chegada`;
+    return `${horaLimpa} - ${turno} - Por Ordem de Chegada`;
 }
 
 /**
