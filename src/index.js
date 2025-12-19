@@ -28,6 +28,7 @@ const botService = new PartnerBotService(PARTNERBOT_URL, AUTH_TOKEN);
 
 // Variável de controle de concorrência
 let isProcessing = false;
+let ultimoLogForaHorario = 0;
 
 // ==========================================
 // 2. SERVIDOR WEB (HEALTH CHECK)
@@ -39,6 +40,19 @@ app.listen(PORT, () => logger.info(`✅ Servidor Web monitorando na porta ${PORT
 // 3. LOGICA PRINCIPAL (WORKER)
 // ==========================================
 async function processarFila() {
+    const agora = new Date();
+    const hora = agora.getHours();
+
+    // Regra de Horário: 08:00 às 17:00
+    if (hora < 8 || hora > 17) {
+        // Log apenas a cada 1 hora para não spammar
+        if (agora.getTime() - ultimoLogForaHorario > 60 * 60 * 1000) {
+            logger.info("zzz Worker em Standby: Fora do horário de envio (08h-17h)");
+            ultimoLogForaHorario = agora.getTime();
+        }
+        return;
+    }
+
     if (isProcessing) {
         logger.info("⏳ Aguardando ciclo anterior...");
         return;
