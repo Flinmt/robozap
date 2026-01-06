@@ -1,5 +1,11 @@
 const sql = require('mssql');
 
+// ========================================================================
+// CONEXÃO COM BANCO DE DADOS (SQL SERVER)
+// ========================================================================
+// Configuração da lib `mssql` para conectar ao SQL Server.
+// As credenciais vêm do arquivo .env.
+
 const dbConfig = {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,

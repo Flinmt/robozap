@@ -41,20 +41,36 @@ app.listen(PORT, () => logger.info(`✅ Servidor Web monitorando na porta ${PORT
 // ==========================================
 async function processarFila() {
     const agora = new Date();
-    const hora = agora.getHours();
 
-    // Regra de Horário: 08:00 às 17:00
+    // ------------------------------------------------------------------------
+    // VERIFICAÇÃO DE HORÁRIO E FUSO
+    // ------------------------------------------------------------------------
+    // Forçamos o fuso horário 'America/Sao_Paulo' para garantir que o worker obedeça
+    // o horário comercial do Brasil, independentemente de onde o servidor esteja (UTC, etc).
+    const options = { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false };
+    const horaStr = new Intl.DateTimeFormat('en-US', options).format(agora);
+    const hora = parseInt(horaStr, 10);
+
+    // Regra: O robô só envia mensagens entre 08:00 e 17:00.
+    // Fora desse horário, ele entra em modo de espera (Standby).
     if (hora < 8 || hora >= 17) {
-        // Log apenas a cada 1 hora para não spammar
+        // Log apenas a cada 1 hora para não poluir o log
         if (agora.getTime() - ultimoLogForaHorario > 60 * 60 * 1000) {
-            logger.info("zzz Worker em Standby: Fora do horário de envio (08h-17h)");
+            logger.info("zzz Worker em Standby: Fora do horário comercial (08h-17h Brasil)");
             ultimoLogForaHorario = agora.getTime();
         }
         return;
     }
 
+    // ------------------------------------------------------------------------
+
+    // ------------------------------------------------------------------------
+    // CONTROLE DE CONCORRÊNCIA (Lock)
+    // ------------------------------------------------------------------------
+    // Evita que uma nova execução comece se a anterior ainda não terminou.
+    // Isso é crucial para não enviar mensagens duplicadas ou sobrecarregar o banco.
     if (isProcessing) {
-        logger.info("⏳ Aguardando ciclo anterior...");
+        logger.info("⏳ Aguardando ciclo anterior terminar...");
         return;
     }
     isProcessing = true;
@@ -163,8 +179,11 @@ async function processarFila() {
         }
 
     } catch (err) {
-        logger.error(`⚠️ Erro Geral: ${err.message}`);
+        logger.error(`⚠️ Erro Geral no Worker: ${err.message}`);
     } finally {
+        // [IMPORTANTE]:
+        // Sempre fechar a conexão com o banco ao final do ciclo.
+        // Liberar a flag 'isProcessing' permite que o próximo ciclo (daqui 10s) possa rodar.
         if (pool) pool.close();
         isProcessing = false;
     }

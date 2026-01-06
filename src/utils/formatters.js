@@ -1,3 +1,11 @@
+// ========================================================================
+// FORMATADORES E CONSTRUTORES DE PAYLOAD
+// ========================================================================
+// Este módulo é responsável por:
+// 1. Limpar e padronizar dados (texto, telefone).
+// 2. Montar a estrutura JSON exata que a API de envio (PartnerBot) espera.
+//    - Os payloads seguem o padrão do WhatsApp Cloud API (templateData).
+
 /**
  * Remove quebras de linha, aspas e retorna "-" se for vazio/nulo.
  * @param {string} texto 

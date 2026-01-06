@@ -5,6 +5,11 @@ class MessageRepository {
         this.pool = pool;
     }
 
+    // ========================================================================
+    // 1. BOAS-VINDAS (Agendamentos Novos)
+    // ========================================================================
+    // Busca agendamentos recém-criados que ainda não receberam a mensagem inicial.
+    // Regra principal: Data do agendamento deve ser FUTURA (> Hoje).
     async buscarMensagensPendentes() {
         const querySelect = `
             SELECT top 20
@@ -38,6 +43,11 @@ class MessageRepository {
         return result.recordset;
     }
 
+    // ========================================================================
+    // 2. CONFIRMAÇÃO / LEMBRETE
+    // ========================================================================
+    // Busca agendamentos que já receberam boas-vindas mas precisam de confirmação.
+    // Regra principal: Enviar para agendamentos de HOJE ou AMANHÃ.
     async buscarConfirmacoesPendentes() {
         const querySelect = `
             SELECT top 20
@@ -59,11 +69,19 @@ class MessageRepository {
             inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
             inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  
             where IsNull(w.bolConfirma,'N') NOT IN ('S')
-            and IsNull(w.bolEnviado,'S') NOT IN ('N')
             and w.bolMensagemErro = 0
             and len(w.strTelefone) >= 10 
-            -- Regra: Enviar 1 dia antes do agendamento
-            and CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE() + 1)
+            
+            -- Lógica complexa de envio:
+            -- 1. Se for agendamento futuro: Só envia lembrete se JÁ tiver enviado boas-vindas (bolEnviado != 'N')
+            -- 2. Se for agendamento HOJE: Envia lembrete DIRETO (ignora checagem de boas-vindas), pois servirá como confirmação dupla.
+            and (
+                (IsNull(w.bolEnviado,'S') NOT IN ('N')) -- Regra padrão
+                OR 
+                (CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE())) -- Exceção para o dia
+            ) 
+            -- Regra: Enviar para agendamentos de hoje e amanhã
+            and CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
             order by a.datAgendamento
         `;
 
@@ -71,6 +89,11 @@ class MessageRepository {
         return result.recordset;
     }
 
+    // ========================================================================
+    // 3. ATUALIZAÇÃO DE STATUS (Write)
+    // ========================================================================
+
+    // Marca a mensagem de BOAS-VINDAS como enviada
     async marcarComoEnviado(id) {
         await this.pool.request()
             .input('id', sql.Int, id)
@@ -85,7 +108,12 @@ class MessageRepository {
             .input('id', sql.Int, id)
             .query(`
                 SET CONTEXT_INFO 0x123456; 
-                UPDATE tblWhatsAppEnvio SET bolConfirma = 'S', bolMensagemErro = 0 WHERE intWhatsAppEnvioId = @id
+                -- Ao confirmar, marcamos também bolEnviado = 'S'.
+                -- Isso garante que, para agendamentos do dia (onde pulamos a msg de boas-vindas),
+                -- ela não seja enviada depois "atrasada".
+                UPDATE tblWhatsAppEnvio 
+                SET bolConfirma = 'S', bolEnviado = 'S', bolMensagemErro = 0 
+                WHERE intWhatsAppEnvioId = @id
             `);
     }
 
