@@ -510,3 +510,75 @@
 {"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2025-12-16 17:43:15"}
 {"level":"info","message":"⏳ Aguardando ciclo anterior...","service":"robo-whatsapp-worker","timestamp":"2025-12-16 17:43:15"}
 {"level":"info","message":"✅ Lembrete enviado ID: 2963","service":"robo-whatsapp-worker","timestamp":"2025-12-16 17:43:20"}
+{"level":"info","message":"🌍 Worker rodando para TODAS as empresas (Modo Global)","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:20"}
+{"level":"info","message":"🚀 Worker Modular Iniciado.","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:20"}
+{"level":"info","message":"✅ Servidor Web monitorando na porta 3001","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:20"}
+{"level":"info","message":"🔍 Encontradas 2 novas mensagens.","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:32"}
+{"level":"info","message":"📤 Enviando Agendamento ID 3744...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:32"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:32"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 3744","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:39"}
+{"level":"info","message":"📤 Enviando Agendamento ID 3745...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:39"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:39"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior terminar...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:40"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 3745","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:45"}
+{"level":"info","message":"🔔 Encontrados 10 lembretes para enviar.","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:46"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3389...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:46"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:46"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior terminar...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:50"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3389","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:52"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3391...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:52"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:52"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3391","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:57"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3420...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:57"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:45:57"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior terminar...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:00"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3420","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:03"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3498...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:03"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:03"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3498","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:09"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3502...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:09"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:09"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior terminar...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:10"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3502","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:15"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3644...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:15"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:15"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior terminar...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:20"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3644","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:21"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3715...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:21"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:21"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3715","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:26"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3719...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:26"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:26"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior terminar...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:30"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3719","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:31"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3720...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:31"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:31"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3720","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:37"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3744...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:37"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:37"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior terminar...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:40"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3744","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:46:42"}
+{"level":"info","message":"🔍 Encontradas 1 novas mensagens.","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:48:32"}
+{"level":"info","message":"📤 Enviando Agendamento ID 3746...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:48:32"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:48:32"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 3746","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:48:39"}
+{"level":"info","message":"🔔 Encontrados 1 lembretes para enviar.","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:48:39"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3746...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:48:39"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:48:39"}
+{"level":"info","message":"⏳ Aguardando ciclo anterior terminar...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:48:40"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3746","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:48:45"}
+{"level":"info","message":"🌍 Worker rodando para TODAS as empresas (Modo Global)","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:51:50"}
+{"level":"info","message":"🚀 Worker Modular Iniciado.","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:51:50"}
+{"level":"info","message":"✅ Servidor Web monitorando na porta 3001","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:51:50"}
+{"level":"info","message":"🔔 Encontrados 1 lembretes para enviar.","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:52:33"}
+{"level":"info","message":"📤 Enviando Lembrete ID 3747...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:52:33"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:52:33"}
+{"level":"info","message":"✅ Lembrete enviado ID: 3747","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:52:38"}
+{"level":"info","message":"🔍 Encontradas 1 novas mensagens.","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:53:32"}
+{"level":"info","message":"📤 Enviando Agendamento ID 3748...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:53:32"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:53:32"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 3748","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:53:38"}
+{"level":"info","message":"🔍 Encontradas 1 novas mensagens.","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:54:22"}
+{"level":"info","message":"📤 Enviando Agendamento ID 3749...","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:54:22"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:54:22"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 3749","service":"robo-whatsapp-worker","timestamp":"2026-01-06 15:54:27"}

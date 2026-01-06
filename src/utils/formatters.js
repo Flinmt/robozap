@@ -1,3 +1,11 @@
+// ========================================================================
+// FORMATADORES E CONSTRUTORES DE PAYLOAD
+// ========================================================================
+// Este módulo é responsável por:
+// 1. Limpar e padronizar dados (texto, telefone).
+// 2. Formatar o horário verificando se é Hora Marcada ou Ordem de Chegada (Turno).
+// 3. Montar a estrutura JSON exata que a API de envio (PartnerBot) espera.
+
 /**
  * Remove quebras de linha, aspas e retorna "-" se for vazio/nulo.
  * @param {string} texto 

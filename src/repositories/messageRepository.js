@@ -5,6 +5,10 @@ class MessageRepository {
         this.pool = pool;
     }
 
+    // ========================================================================
+    // 1. BOAS-VINDAS (Agendamentos Novos)
+    // ========================================================================
+    // Busca agendamentos recém-criados que ainda não receberam a mensagem inicial.
     async buscarMensagensPendentes() {
         const querySelect = `
             SELECT TOP 20
@@ -37,6 +41,8 @@ class MessageRepository {
               AND strTipo IN ('agenda', 'agendainicio', 'Cadencia')
               AND LEN(W.strTelefone) >= 10 
               AND CONVERT(DATE, datWhatsAppEnvio) = CONVERT(DATE, GETDATE())
+              -- FIX: Não enviar Boas-vindas se for para o MESMO DIA (pois o Lembrete já fará esse papel duplo)
+              AND CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE())
             
             ORDER BY datWhatsAppEnvio
         `;
@@ -45,6 +51,11 @@ class MessageRepository {
         return result.recordset;
     }
 
+    // ========================================================================
+    // 2. CONFIRMAÇÃO / LEMBRETE
+    // ========================================================================
+    // Busca agendamentos que já receberam boas-vindas mas precisam de confirmação.
+    // Regra principal: Enviar para agendamentos de HOJE ou AMANHÃ.
     async buscarConfirmacoesPendentes() {
         const querySelect = `
             SELECT top 20
@@ -64,24 +75,37 @@ class MessageRepository {
                 -- Let's provide the same keys expected by index.js -> formatters.js
                  'Av. Júlia Rodrigues Torres' as strEndereco,
                  '855' as strNumero,
-                 'Floresta' as strBairro,
+                 'Floresta, Belo Jardim' as strBairro,
                  'PE' as strEstado,
 
                 dbo.fncBase64_Encode(CONVERT(VARCHAR, w.intagendaid) + '-' + CONVERT(VARCHAR, GETDATE(), 120)) AS Link
             from tblWhatsAppEnvio W
             inner join vwAgenda a on a.intAgendaId = w.intAgendaId
             where IsNull(w.bolConfirma,'N') NOT IN ('S')
-            and IsNull(w.bolEnviado,'S') NOT IN ('N')
+            
+            -- Lógica complexa de envio (Reaplicada):
+            -- 1. Se for agendamento futuro: Só envia lembrete se JÁ tiver enviado boas-vindas (bolEnviado != 'N')
+            -- 2. Se for agendamento HOJE: Envia lembrete DIRETO (ignora checagem de boas-vindas).
+            and (
+                (IsNull(w.bolEnviado,'S') NOT IN ('N')) 
+                OR 
+                (CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE()))
+            )
             and w.bolMensagemErro = 0
             and len(w.strTelefone) >= 10 
-            -- Regra: Enviar 1 dia antes do agendamento
-            and CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE() + 1)
+            
+            -- Regra: Enviar para agendamentos de HOJE e AMANHÃ
+            and CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
             order by w.datWhatsAppEnvio
         `;
 
         const result = await this.pool.request().query(querySelect);
         return result.recordset;
     }
+
+    // ========================================================================
+    // 3. ATUALIZAÇÃO DE STATUS (Write)
+    // ========================================================================
 
     async marcarComoEnviado(id) {
         await this.pool.request()
@@ -97,7 +121,10 @@ class MessageRepository {
             .input('id', sql.Int, id)
             .query(`
                 SET CONTEXT_INFO 0x123456; 
-                UPDATE tblWhatsAppEnvio SET bolConfirma = 'S', bolMensagemErro = 0 WHERE intWhatsAppEnvioId = @id
+                -- Kill Switch: Ao confirmar o lembrete, marcamos 'bolEnviado' também para evitar envio tardio de boas-vindas.
+                UPDATE tblWhatsAppEnvio 
+                SET bolConfirma = 'S', bolEnviado = 'S', bolMensagemErro = 0 
+                WHERE intWhatsAppEnvioId = @id
             `);
     }
 

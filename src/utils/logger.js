@@ -1,7 +1,14 @@
 const winston = require('winston');
 const path = require('path');
 
-// Define logs directory
+// ========================================================================
+// SISTEMA DE LOGS (Winston)
+// ========================================================================
+// Configura onde os logs serão salvos:
+// 1. Arquivos: /logs/app.log (Geral) e /logs/error.log (Apenas erros)
+// 2. Console: Exibido no terminal durante o desenvolvimento (colorido)
+
+// Define o diretório onde os logs serão salvos
 const logsDir = path.resolve(__dirname, '../../logs');
 
 const logger = winston.createLogger({
@@ -17,8 +24,8 @@ const logger = winston.createLogger({
     defaultMeta: { service: 'robo-whatsapp-worker' },
     transports: [
         //
-        // - Write all logs with importance level of `error` or less to `error.log`
-        // - Write all logs with importance level of `info` or less to `app.log`
+        // - Escreve todos os logs com nível 'error' (ou mais graves) em `error.log`
+        // - Escreve todos os logs com nível 'info' (ou mais graves) em `app.log`
         //
         new winston.transports.File({ filename: path.join(logsDir, 'error.log'), level: 'error' }),
         new winston.transports.File({ filename: path.join(logsDir, 'app.log') }),
@@ -26,8 +33,8 @@ const logger = winston.createLogger({
 });
 
 //
-// If we're not in production then log to the `console` with the format:
-// `${info.level}: ${info.message} JSON.stringify({ ...rest }) `
+// Se NÃO estivermos em ambiente de produção, logar também no `console` (terminal).
+// Formato visual: `${timestamp} [service] ${level}: ${message}`
 //
 if (process.env.NODE_ENV !== 'production') {
     logger.add(new winston.transports.Console({
