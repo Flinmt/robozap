@@ -59,7 +59,25 @@ function formatarHorario(horario, bolAtendeHoraMarcada) {
  * @returns {string}
  */
 function limparTelefone(telefone) {
-    return String(telefone).replace(/\D/g, "");
+    const apenasDigitos = String(telefone).replace(/\D/g, "");
+    
+    // Regra BR (com DDI): 55 + DDD + 9 + numero -> remover o 9
+    // Ex.: 5511991234567 -> 551191234567
+    if (apenasDigitos.startsWith("55")) {
+        const numeroNacional = apenasDigitos.slice(2);
+        if (numeroNacional.length === 11 && numeroNacional[2] === "9") {
+            return "55" + numeroNacional.slice(0, 2) + numeroNacional.slice(3);
+        }
+        return apenasDigitos;
+    }
+
+    // Regra BR (sem DDI): DDD + 9 + numero -> remover o 9
+    // Ex.: 11991234567 -> 1191234567
+    if (apenasDigitos.length === 11 && apenasDigitos[2] === "9") {
+        return apenasDigitos.slice(0, 2) + apenasDigitos.slice(3);
+    }
+
+    return apenasDigitos;
 }
 
 /**
@@ -71,7 +89,7 @@ function limparTelefone(telefone) {
 function montarPayloadAgendamento(telefoneFinal, dados) {
     return {
         number: telefoneFinal,
-        isClosed: true,
+        isClosed: false,
         templateData: {
             messaging_product: "whatsapp",
             to: telefoneFinal,
@@ -108,7 +126,7 @@ function montarPayloadAgendamento(telefoneFinal, dados) {
 function montarPayloadConfirmacao(telefoneFinal, dados, link) {
     return {
         number: telefoneFinal,
-        isClosed: true,
+        isClosed: false,
         templateData: {
             messaging_product: "whatsapp",
             to: telefoneFinal,
