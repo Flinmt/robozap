@@ -2,3 +2,4 @@
 .env.imagemcor
 .env.univision
 node_modules/
+logs/

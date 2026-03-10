@@ -86,10 +86,10 @@ function limparTelefone(telefone) {
  * @param {object} dados - Objeto com os campos p_agenda, p_data, etc.
  * @returns {object}
  */
-function montarPayloadAgendamento(telefoneFinal, dados) {
+function montarPayloadAgendamento(telefoneFinal, dados, isClosed = false) {
     return {
         number: telefoneFinal,
-        isClosed: false,
+        isClosed,
         templateData: {
             messaging_product: "whatsapp",
             to: telefoneFinal,
@@ -123,10 +123,10 @@ function montarPayloadAgendamento(telefoneFinal, dados) {
  * @param {string} link - URL para o botão.
  * @returns {object}
  */
-function montarPayloadConfirmacao(telefoneFinal, dados, link) {
+function montarPayloadConfirmacao(telefoneFinal, dados, link, isClosed = false) {
     return {
         number: telefoneFinal,
-        isClosed: false,
+        isClosed,
         templateData: {
             messaging_product: "whatsapp",
             to: telefoneFinal,

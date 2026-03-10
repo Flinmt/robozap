@@ -14,6 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const PARTNERBOT_URL = process.env.URL;
 const AUTH_TOKEN = process.env.AUTH_TOKEN;
+const SHOWTICKET_URL = process.env.SHOWTICKET_URL || (PARTNERBOT_URL ? PARTNERBOT_URL.replace(/\/template$/, '/showticket') : null);
 const COMPANY_NAME = process.env.COMPANY_NAME || null;
 const INTERVALO_CHECK = 10000;
 
@@ -24,7 +25,7 @@ if (COMPANY_NAME) {
 }
 
 // Serviço de envio (Stateful, configurado uma vez)
-const botService = new PartnerBotService(PARTNERBOT_URL, AUTH_TOKEN);
+const botService = new PartnerBotService(PARTNERBOT_URL, AUTH_TOKEN, SHOWTICKET_URL);
 
 // Variável de controle de concorrência
 let isProcessing = false;
@@ -105,9 +106,12 @@ async function processarFila() {
                         p_unidade: formatters.limparTexto(msg.strunidade)
                     };
 
-                    const payload = formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados);
+                    const ticket = await botService.verificarTicketAberto(telefoneFinal);
+                    const isClosed = !ticket.encontrado;
+                    logger.info(`[TicketCheck] Agendamento ID ${msg.intWhatsAppEnvioId} numero=${telefoneFinal} ticketAberto=${ticket.encontrado}`);
+                    const payload = formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados, isClosed);
 
-                    logger.info(`📤 Enviando Agendamento ID ${msg.intWhatsAppEnvioId}...`);
+                    logger.info(`📤 Enviando Agendamento ID ${msg.intWhatsAppEnvioId} com isClosed=${isClosed}...`);
 
                     // Enviar
                     await botService.enviarMensagem(payload);
@@ -159,9 +163,12 @@ async function processarFila() {
                     // Link para o botão (conteúdo da coluna Link)
                     const linkBotao = msg.Link || '-';
 
-                    const payload = formatters.montarPayloadConfirmacao(telefoneFinal, dadosFormatados, linkBotao);
+                    const ticket = await botService.verificarTicketAberto(telefoneFinal);
+                    const isClosed = !ticket.encontrado;
+                    logger.info(`[TicketCheck] Lembrete ID ${msg.intWhatsAppEnvioId} numero=${telefoneFinal} ticketAberto=${ticket.encontrado}`);
+                    const payload = formatters.montarPayloadConfirmacao(telefoneFinal, dadosFormatados, linkBotao, isClosed);
 
-                    logger.info(`📤 Enviando Lembrete ID ${msg.intWhatsAppEnvioId}...`);
+                    logger.info(`📤 Enviando Lembrete ID ${msg.intWhatsAppEnvioId} com isClosed=${isClosed}...`);
 
                     await botService.enviarMensagem(payload);
 

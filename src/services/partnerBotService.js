@@ -5,9 +5,42 @@ const logger = require('../utils/logger');
 class PartnerBotService {
     // Serviço responsável pela comunicação HTTP com a API externa (PartnerBot).
     // Encapsula a complexidade do Axios e autenticação.
-    constructor(apiUrl, authToken) {
+    constructor(apiUrl, authToken, showTicketUrl) {
         this.apiUrl = apiUrl;
         this.authToken = authToken;
+        this.showTicketUrl = showTicketUrl;
+    }
+
+    async verificarTicketAberto(numero) {
+        if (!this.showTicketUrl) {
+            throw new Error('SHOWTICKET_URL nao configurada');
+        }
+
+        try {
+            const response = await axios.post(this.showTicketUrl, {
+                number: numero
+            }, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': this.authToken
+                },
+                validateStatus: (status) => status === 200 || status === 404
+            });
+
+            return {
+                encontrado: response.status === 200,
+                dados: response.data
+            };
+        } catch (error) {
+            if (error.response) {
+                logger.error(`[PartnerBotService] Erro ao consultar ticket: Status ${error.response.status}`);
+                logger.error(`[PartnerBotService] Data: ${JSON.stringify(error.response.data)}`);
+            } else {
+                logger.error(`[PartnerBotService] Erro sem response ao consultar ticket: ${error.message}`);
+            }
+
+            throw new Error('Falha ao consultar ticket antes do envio');
+        }
     }
 
     // Envia o payload (JSON) para a API.
