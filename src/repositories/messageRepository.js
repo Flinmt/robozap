@@ -45,7 +45,7 @@ class MessageRepository {
                   AND strTipo IN ('agenda', 'agendainicio', 'Cadencia')
                   AND LEN(strTelefone) >= 10
                   AND CONVERT(DATE, datWhatsAppEnvio) = CONVERT(DATE, GETDATE())
-                  AND CONVERT(DATE, datAgendamento) > CONVERT(DATE, GETDATE())
+                  AND CONVERT(DATE, datAgendamento) > CONVERT(DATE, GETDATE() + 1)
             )
             SELECT TOP 20
                 '55' + strTelefone AS strtelefone,
@@ -110,14 +110,10 @@ class MessageRepository {
                 FROM Ranked
                 WHERE rn = 1
                   AND ISNULL(bolConfirma, 'N') NOT IN ('S')
-                  AND (
-                        ISNULL(bolEnviado, 'S') NOT IN ('N')
-                        OR CONVERT(DATE, datAgendamento) = CONVERT(DATE, GETDATE())
-                      )
-                  AND bolMensagemErro = 0
-                  AND LEN(strTelefone) >= 10
                   AND CONVERT(DATE, datAgendamento)
                       BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
+                  AND bolMensagemErro = 0
+                  AND LEN(strTelefone) >= 10
             )
             SELECT TOP 20
                 '55' + strTelefone AS strtelefone,

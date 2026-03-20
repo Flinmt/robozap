@@ -672,3 +672,30 @@
 {"level":"info","message":"📤 Enviando Agendamento ID 8716 com isClosed=true...","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:00:01"}
 {"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:00:01"}
 {"level":"info","message":"✅ Sucesso Agendamento ID: 8716","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:00:07"}
+{"level":"info","message":"🌍 Worker rodando para TODAS as empresas (Modo Global)","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:14:51"}
+{"level":"info","message":"🚀 Worker Modular Iniciado.","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:14:51"}
+{"level":"info","message":"✅ Servidor Web monitorando na porta 3001","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:14:51"}
+{"level":"info","message":"🔍 Encontradas 1 novas mensagens.","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:15:12"}
+{"level":"info","message":"[TicketCheck] Agendamento ID 8721 numero=558799146789 ticketAberto=false","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:15:13"}
+{"level":"info","message":"📤 Enviando Agendamento ID 8721 com isClosed=true...","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:15:13"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:15:13"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 8721","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:15:18"}
+{"level":"info","message":"🌍 Worker rodando para TODAS as empresas (Modo Global)","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:16:08"}
+{"level":"info","message":"🚀 Worker Modular Iniciado.","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:16:08"}
+{"level":"info","message":"✅ Servidor Web monitorando na porta 3001","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:16:08"}
+{"level":"info","message":"🌍 Worker rodando para TODAS as empresas (Modo Global)","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:17:41"}
+{"level":"info","message":"🚀 Worker Modular Iniciado.","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:17:41"}
+{"level":"info","message":"✅ Servidor Web monitorando na porta 3001","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:17:41"}
+{"level":"info","message":"🌍 Worker rodando para TODAS as empresas (Modo Global)","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:22:14"}
+{"level":"info","message":"🚀 Worker Modular Iniciado.","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:22:14"}
+{"level":"info","message":"✅ Servidor Web monitorando na porta 3001","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:22:14"}
+{"level":"info","message":"🔔 Encontrados 1 lembretes para enviar.","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:22:26"}
+{"level":"info","message":"[TicketCheck] Lembrete ID 8723 numero=558192946508 ticketAberto=false","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:22:26"}
+{"level":"info","message":"📤 Enviando Lembrete ID 8723 com isClosed=true...","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:22:26"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:22:26"}
+{"level":"info","message":"✅ Lembrete enviado ID: 8723","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:22:32"}
+{"level":"info","message":"🔍 Encontradas 1 novas mensagens.","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:23:35"}
+{"level":"info","message":"[TicketCheck] Agendamento ID 8724 numero=558192946508 ticketAberto=false","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:23:36"}
+{"level":"info","message":"📤 Enviando Agendamento ID 8724 com isClosed=true...","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:23:36"}
+{"level":"info","message":"[PartnerBotService] Enviando para: https://painel.partnerbot.com.br/v2/api/external/ec32e343-e5a8-4a5e-aa58-9e83d305cc1d/template","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:23:36"}
+{"level":"info","message":"✅ Sucesso Agendamento ID: 8724","service":"robo-whatsapp-worker","timestamp":"2026-03-20 14:23:41"}
