@@ -206,7 +206,7 @@ function renderAdminPage() {
     :root {
       color-scheme: light;
       font-family: Arial, sans-serif;
-      --bg: #f6f7f9;
+      --bg: #f4f6f8;
       --panel: #ffffff;
       --line: #d8dde5;
       --text: #17202a;
@@ -214,29 +214,53 @@ function renderAdminPage() {
       --primary: #1769aa;
       --danger: #b42318;
       --ok: #067647;
+      --warn: #b54708;
+      --soft: #eef4ff;
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text); }
     header { background: #202938; color: #fff; padding: 18px 24px; }
-    header .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 980px; margin: 0 auto; }
+    header .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1160px; margin: 0 auto; }
     header h1 { margin: 0; font-size: 22px; }
     header a { color: #fff; text-decoration: none; border: 1px solid rgba(255,255,255,.45); border-radius: 6px; padding: 8px 10px; font-size: 14px; }
-    main { max-width: 980px; margin: 0 auto; padding: 24px; }
+    main { max-width: 1160px; margin: 0 auto; padding: 24px; }
     section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px; margin-bottom: 18px; }
     h2 { font-size: 18px; margin: 0 0 14px; }
+    h3 { font-size: 15px; margin: 0; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+    .section-head p { color: var(--muted); margin: 4px 0 0; font-size: 13px; }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     .status { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
     .stat { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #fbfcfd; }
     .stat span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
     .stat strong { font-size: 16px; }
+    .pill { display: inline-flex; align-items: center; min-height: 26px; border-radius: 999px; padding: 4px 10px; background: var(--soft); color: #1849a9; font-size: 12px; font-weight: 700; }
+    .config-section { background: transparent; border: 0; padding: 0; }
+    .config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+    .config-group { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+    .config-group.wide { grid-column: 1 / -1; }
+    .group-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .field-stack { display: grid; gap: 12px; }
+    .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
-    input[type="text"], input[type="number"] { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 10px; font-size: 14px; }
-    .toggle { display: flex; align-items: center; gap: 10px; padding: 10px 0; color: var(--text); }
+    input[type="text"], input[type="number"], input[type="date"] { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 10px; font-size: 14px; background: #fff; color: var(--text); }
+    input:focus { outline: 2px solid rgba(23, 105, 170, .18); border-color: var(--primary); }
+    .helper { display: block; color: var(--muted); font-size: 12px; margin-top: 5px; line-height: 1.35; }
+    .switch-list { display: grid; gap: 10px; }
+    .toggle { display: grid; grid-template-columns: 42px 1fr; align-items: center; gap: 10px; min-height: 48px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: #fbfcfd; margin: 0; }
+    .toggle input { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: #cbd5e1; position: relative; cursor: pointer; transition: .18s ease; }
+    .toggle input::after { content: ""; position: absolute; width: 18px; height: 18px; top: 2px; left: 2px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(16, 24, 40, .25); transition: .18s ease; }
+    .toggle input:checked { background: var(--primary); }
+    .toggle input:checked::after { transform: translateX(16px); }
+    .toggle span { font-size: 14px; font-weight: 700; }
+    .toggle small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; margin-top: 3px; line-height: 1.35; }
     .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
     button { border: 0; border-radius: 6px; padding: 10px 14px; font-size: 14px; cursor: pointer; background: var(--primary); color: #fff; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
     button.secondary { background: #475467; }
     button.danger { background: var(--danger); }
-    .message { color: var(--muted); margin-top: 12px; min-height: 20px; }
+    .form-footer { position: sticky; bottom: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 12px 0 0; background: linear-gradient(180deg, rgba(244,246,248,0), var(--bg) 38%); }
+    .message { color: var(--muted); min-height: 20px; font-size: 14px; }
     .ok { color: var(--ok); }
     .bad { color: var(--danger); }
     .table-wrap { overflow-x: auto; }
@@ -246,8 +270,10 @@ function renderAdminPage() {
     td.name { white-space: normal; min-width: 220px; }
     @media (max-width: 760px) {
       main { padding: 14px; }
-      .grid, .status { grid-template-columns: 1fr; }
+      .grid, .status, .config-grid, .field-row { grid-template-columns: 1fr; }
       header .topbar { align-items: flex-start; flex-direction: column; }
+      .form-footer { align-items: stretch; flex-direction: column; }
+      .form-footer button { width: 100%; }
     }
   </style>
 </head>
@@ -275,60 +301,140 @@ function renderAdminPage() {
       </div>
     </section>
 
-    <section>
-      <h2>Configuracao operacional</h2>
+    <section class="config-section">
+      <div class="section-head">
+        <div>
+          <h2>Configuracao operacional</h2>
+          <p>Ajustes salvos no runtime do worker.</p>
+        </div>
+        <span class="pill">Sem segredos</span>
+      </div>
       <form id="configForm">
-        <div class="grid">
-          <div>
-            <label for="templateNewSchedule">Template novo agendamento</label>
-            <input id="templateNewSchedule" name="templateNewSchedule" type="text">
+        <div class="config-grid">
+          <div class="config-group">
+            <div class="group-title">
+              <h3>Templates</h3>
+              <span class="pill">PartnerBot</span>
+            </div>
+            <div class="field-stack">
+              <div>
+                <label for="templateNewSchedule">Agendamento realizado</label>
+                <input id="templateNewSchedule" name="templateNewSchedule" type="text">
+              </div>
+              <div>
+                <label for="templateReminder">Confirmacao de presenca</label>
+                <input id="templateReminder" name="templateReminder" type="text">
+              </div>
+            </div>
           </div>
-          <div>
-            <label for="templateReminder">Template confirmacao/lembrete</label>
-            <input id="templateReminder" name="templateReminder" type="text">
+
+          <div class="config-group">
+            <div class="group-title">
+              <h3>Janela de envio</h3>
+              <span class="pill">Brasil</span>
+            </div>
+            <div class="field-stack">
+              <div class="field-row">
+                <div>
+                  <label for="businessHoursStart">Inicio</label>
+                  <input id="businessHoursStart" name="businessHoursStart" type="number" min="0" max="23">
+                </div>
+                <div>
+                  <label for="businessHoursEnd">Fim</label>
+                  <input id="businessHoursEnd" name="businessHoursEnd" type="number" min="0" max="23">
+                </div>
+              </div>
+              <div class="field-row">
+                <div>
+                  <label for="messagingStartDate">Consultas a partir de</label>
+                  <input id="messagingStartDate" name="messagingStartDate" type="date">
+                </div>
+                <div>
+                  <label for="outboundSendStartDate">Disparos a partir de</label>
+                  <input id="outboundSendStartDate" name="outboundSendStartDate" type="date">
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <label for="businessHoursStart">Inicio do envio</label>
-            <input id="businessHoursStart" name="businessHoursStart" type="number" min="0" max="23">
+
+          <div class="config-group">
+            <div class="group-title">
+              <h3>Produtor de fila</h3>
+              <span class="pill">Agenda</span>
+            </div>
+            <div class="field-stack">
+              <label class="toggle">
+                <input id="queueProducerEnabled" name="queueProducerEnabled" type="checkbox">
+                <span>Criar fila automaticamente<small>Busca agendamentos elegiveis na vwAgenda.</small></span>
+              </label>
+              <div class="field-row">
+                <div>
+                  <label for="queueProducerLookaheadDays">Janela da fila em dias</label>
+                  <input id="queueProducerLookaheadDays" name="queueProducerLookaheadDays" type="number" min="0" max="365">
+                </div>
+                <div>
+                  <label for="queueProducerLimit">Limite por ciclo</label>
+                  <input id="queueProducerLimit" name="queueProducerLimit" type="number" min="1" max="500">
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <label for="businessHoursEnd">Fim do envio</label>
-            <input id="businessHoursEnd" name="businessHoursEnd" type="number" min="0" max="23">
+
+          <div class="config-group">
+            <div class="group-title">
+              <h3>Modo seguro</h3>
+              <span class="pill">Operacao</span>
+            </div>
+            <div class="field-stack">
+              <label class="toggle">
+                <input id="testModeEnabled" name="testModeEnabled" type="checkbox">
+                <span>Modo teste<small>Restringe fila e envio pelo nome do paciente.</small></span>
+              </label>
+              <div>
+                <label for="testPatientNameFilter">Texto do filtro</label>
+                <input id="testPatientNameFilter" name="testPatientNameFilter" type="text">
+              </div>
+              <label class="toggle">
+                <input id="skipPastAppointmentTime" name="skipPastAppointmentTime" type="checkbox">
+                <span>Ignorar horarios passados<small>Bloqueia lembretes de consultas que ja passaram.</small></span>
+              </label>
+            </div>
           </div>
-          <div>
-            <label for="queueProducerLookaheadDays">Janela da fila (dias)</label>
-            <input id="queueProducerLookaheadDays" name="queueProducerLookaheadDays" type="number" min="0" max="365">
-          </div>
-          <div>
-            <label for="queueProducerLimit">Limite de criacao por ciclo</label>
-            <input id="queueProducerLimit" name="queueProducerLimit" type="number" min="1" max="500">
-          </div>
-          <div>
-            <label for="testPatientNameFilter">Filtro do modo teste</label>
-            <input id="testPatientNameFilter" name="testPatientNameFilter" type="text">
-          </div>
-          <div>
-            <label for="messagingStartDate">Enviar apenas agendamentos a partir de</label>
-            <input id="messagingStartDate" name="messagingStartDate" type="date">
-          </div>
-          <div>
-            <label for="outboundSendStartDate">Comecar a enviar mensagens em</label>
-            <input id="outboundSendStartDate" name="outboundSendStartDate" type="date">
+
+          <div class="config-group wide">
+            <div class="group-title">
+              <h3>Formato do payload</h3>
+              <span class="pill">WhatsApp</span>
+            </div>
+            <div class="switch-list">
+              <label class="toggle">
+                <input id="partnerbotIsClosed" name="partnerbotIsClosed" type="checkbox">
+                <span>Enviar com isClosed=true<small>Controla o estado da conversa na PartnerBot.</small></span>
+              </label>
+              <label class="toggle">
+                <input id="includeCompany" name="includeCompany" type="checkbox">
+                <span>Incluir empresa no corpo<small>Adiciona empresa como parametro do template.</small></span>
+              </label>
+              <label class="toggle">
+                <input id="includeUnit" name="includeUnit" type="checkbox">
+                <span>Incluir unidade/endereco<small>Adiciona unidade como parametro do template.</small></span>
+              </label>
+              <label class="toggle">
+                <input id="includeConfirmationButton" name="includeConfirmationButton" type="checkbox">
+                <span>Incluir botao de confirmacao<small>Envia o token dinamico para a URL do template.</small></span>
+              </label>
+              <label class="toggle">
+                <input id="syncAgendaWhatsappStatus" name="syncAgendaWhatsappStatus" type="checkbox">
+                <span>Sincronizar status na agenda<small>Marca WhatsApp enviado apos sucesso.</small></span>
+              </label>
+            </div>
           </div>
         </div>
-        <label class="toggle"><input id="partnerbotIsClosed" name="partnerbotIsClosed" type="checkbox"> Enviar com isClosed=true</label>
-        <label class="toggle"><input id="includeCompany" name="includeCompany" type="checkbox"> Incluir empresa no corpo</label>
-        <label class="toggle"><input id="includeUnit" name="includeUnit" type="checkbox"> Incluir unidade/endereco no corpo</label>
-        <label class="toggle"><input id="includeConfirmationButton" name="includeConfirmationButton" type="checkbox"> Incluir botao de confirmacao</label>
-        <label class="toggle"><input id="queueProducerEnabled" name="queueProducerEnabled" type="checkbox"> Criar fila automaticamente a partir da agenda</label>
-        <label class="toggle"><input id="testModeEnabled" name="testModeEnabled" type="checkbox"> Modo teste: usar somente pacientes filtrados</label>
-        <label class="toggle"><input id="syncAgendaWhatsappStatus" name="syncAgendaWhatsappStatus" type="checkbox"> Sincronizar status de WhatsApp enviado na agenda</label>
-        <label class="toggle"><input id="skipPastAppointmentTime" name="skipPastAppointmentTime" type="checkbox"> Ignorar consultas com horario ja passado</label>
-        <div class="actions">
+        <div class="form-footer">
+          <div id="message" class="message"></div>
           <button type="submit">Salvar configuracao</button>
         </div>
       </form>
-      <div id="message" class="message"></div>
     </section>
 
     <section>
@@ -406,11 +512,18 @@ function renderAdminPage() {
 
     function renderStatus(data) {
       const paused = data.config.paused;
-      document.getElementById('workerStatus').textContent = paused ? 'Pausado' : 'Ativo';
+      const lastResult = data.lastCycleResult || '-';
+      let workerLabel = paused ? 'Pausado' : 'Ativo';
+      if (!paused && lastResult.includes('Fora do horario')) workerLabel = 'Ativo (fora do horario)';
+      if (!paused && lastResult.includes('bloqueados ate')) workerLabel = 'Ativo (envio agendado)';
+
+      document.getElementById('workerStatus').textContent = workerLabel;
       document.getElementById('processingStatus').textContent = data.isProcessing ? 'Sim' : 'Nao';
       document.getElementById('lastCycle').textContent = data.lastCycleAt ? new Date(data.lastCycleAt).toLocaleString() : '-';
-      document.getElementById('lastResult').textContent = data.lastCycleResult || '-';
+      document.getElementById('lastResult').textContent = lastResult;
       document.getElementById('queueProduced').textContent = data.lastQueueProducedCount ?? 0;
+      document.getElementById('resumeBtn').disabled = !paused;
+      document.getElementById('pauseBtn').disabled = paused;
       fillConfig(data.config);
     }
 

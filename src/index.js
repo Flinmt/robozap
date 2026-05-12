@@ -83,12 +83,14 @@ app.get('/api/admin/queue', requireAdmin, async (req, res) => {
 app.post('/api/admin/pause', requireAdmin, (req, res) => {
     const config = runtimeConfig.updateConfig({ paused: true });
     workerState.lastCycleResult = 'Pausado pelo painel';
+    logger.info('Worker pausado pelo painel administrativo');
     res.json({ config });
 });
 
 app.post('/api/admin/resume', requireAdmin, (req, res) => {
     const config = runtimeConfig.updateConfig({ paused: false });
     workerState.lastCycleResult = 'Retomado pelo painel';
+    logger.info('Worker retomado pelo painel administrativo');
     res.json({ config });
 });
 

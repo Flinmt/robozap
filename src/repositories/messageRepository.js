@@ -26,7 +26,7 @@ class MessageRepository {
             )
             OUTPUT inserted.intWhatsAppEnvioId INTO @created
             SELECT TOP (@limit)
-                'agendainicio',
+                'AgendaInicio',
                 'N',
                 0,
                 'N',
@@ -70,7 +70,7 @@ class MessageRepository {
                   SELECT 1
                   FROM tblWhatsAppEnvio w
                   WHERE w.intAgendaId = a.intAgendaId
-                    AND w.strTipo = 'agendainicio'
+                    AND w.strTipo IN ('AgendaInicio', 'agendainicio')
               )
             ORDER BY a.datAgendamento, a.strHora, a.intAgendaId;
 
@@ -90,58 +90,77 @@ class MessageRepository {
 
     async listarFilaPendente(config) {
         const querySelect = `
-            SELECT TOP 100
-                w.intWhatsAppEnvioId,
-                w.intAgendaId,
-                w.strTipo,
-                CASE WHEN a.strAgenda='' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
-                w.strTelefone,
-                IsNull(w.bolEnviado,'N') AS bolEnviado,
-                IsNull(w.bolConfirma,'N') AS bolConfirma,
-                w.bolMensagemErro,
-                convert(varchar, a.datAgendamento, 103) as datagenda,
-                a.strHora,
-                a.strProfissional,
-                E.strEmpresa,
-                CASE
-                    WHEN IsNull(w.bolEnviado,'N') NOT IN ('S')
-                     AND w.bolMensagemErro = 0
-                     AND w.strTipo = 'agendainicio'
-                     AND len(w.strTelefone) >= 10
-                     AND CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE())
-                     AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-                    THEN 'agendamento'
-                    WHEN IsNull(w.bolConfirma,'N') NOT IN ('S')
-                     AND w.bolMensagemErro = 0
-                     AND len(w.strTelefone) >= 10
-                     AND (
-                        (IsNull(w.bolEnviado,'S') NOT IN ('N'))
-                        OR (CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE()))
-                     )
-                     AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
-                     AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-                     AND (
-                        @skipPastAppointmentTime = 0
-                        OR ISNULL(
-                            TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
-                            a.datAgendamento
-                        ) >= GETDATE()
-                     )
-                    THEN 'confirmacao'
-                    ELSE 'fora_dos_filtros'
-                END AS tipoFila
-            from tblWhatsAppEnvio W
-            inner join vwAgenda a on a.intAgendaId = w.intAgendaId
-            inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId
-            inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId
-            where w.bolMensagemErro = 0
-            and (
-                IsNull(w.bolEnviado,'N') NOT IN ('S')
-                OR IsNull(w.bolConfirma,'N') NOT IN ('S')
+            WITH fila AS (
+                SELECT
+                    w.intWhatsAppEnvioId,
+                    w.intAgendaId,
+                    w.strTipo,
+                    CASE WHEN a.strAgenda = '' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
+                    w.strTelefone,
+                    IsNull(w.bolEnviado,'N') AS bolEnviado,
+                    IsNull(w.bolConfirma,'N') AS bolConfirma,
+                    w.bolMensagemErro,
+                    convert(varchar, a.datAgendamento, 103) as datagenda,
+                    a.datAgendamento,
+                    a.strHora,
+                    a.strProfissional,
+                    E.strEmpresa,
+                    CASE
+                        WHEN IsNull(w.bolEnviado,'N') NOT IN ('S')
+                         AND w.bolMensagemErro = 0
+                         AND w.strTipo IN ('AgendaInicio', 'agendainicio')
+                         AND len(w.strTelefone) >= 10
+                         AND CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE())
+                         AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
+                        THEN 'agendamento'
+                        WHEN IsNull(w.bolConfirma,'N') NOT IN ('S')
+                         AND w.bolMensagemErro = 0
+                         AND len(w.strTelefone) >= 10
+                         AND (
+                            (IsNull(w.bolEnviado,'S') NOT IN ('N'))
+                            OR (CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE()))
+                         )
+                         AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
+                         AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
+                         AND (
+                            @skipPastAppointmentTime = 0
+                            OR ISNULL(
+                                TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                                a.datAgendamento
+                            ) >= GETDATE()
+                         )
+                        THEN 'confirmacao'
+                        ELSE 'fora_dos_filtros'
+                    END AS tipoFila
+                FROM tblWhatsAppEnvio W
+                INNER JOIN vwAgenda a ON a.intAgendaId = w.intAgendaId
+                INNER JOIN tblAgenda TA ON TA.intAgendaId = w.intAgendaId
+                INNER JOIN tblEmpresa E ON E.intEmpresaId = TA.intUnidadeId
+                WHERE w.bolMensagemErro = 0
+                  AND (
+                    IsNull(w.bolEnviado,'N') NOT IN ('S')
+                    OR IsNull(w.bolConfirma,'N') NOT IN ('S')
+                  )
+                  AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
+                  AND (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
             )
-            and (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-            and (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter OR W.strAgenda LIKE @testNameFilter)
-            order by a.datAgendamento, a.strHora, w.intWhatsAppEnvioId
+            SELECT TOP 100
+                intWhatsAppEnvioId,
+                intAgendaId,
+                strTipo,
+                strAgenda,
+                strTelefone,
+                bolEnviado,
+                bolConfirma,
+                bolMensagemErro,
+                datagenda,
+                strHora,
+                strProfissional,
+                strEmpresa,
+                tipoFila
+            FROM fila
+            WHERE tipoFila IN ('agendamento', 'confirmacao')
+            ORDER BY datAgendamento, strHora, intWhatsAppEnvioId
         `;
 
         const result = await this.pool.request()
@@ -182,7 +201,7 @@ class MessageRepository {
             inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  
             where IsNull(w.bolEnviado,'N') NOT IN ('S') 
             and w.bolMensagemErro = 0
-            and w.strTipo = 'agendainicio' 
+            and w.strTipo IN ('AgendaInicio', 'agendainicio')
             and len(w.strTelefone) >= 10 
             and CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE())
             and (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
