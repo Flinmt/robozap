@@ -2,20 +2,25 @@ services:
   app:
     build: .
     restart: always
-    ports:
-      - "3000:3000"
+    container_name: worker-geral
     env_file:
       - .env
-    environment:
-      - PORT=3000
-    container_name: worker-geral
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    volumes:
+      - ./config:/usr/src/app/config
+      - ./logs:/usr/src/app/logs
 
-  # Exemplo de worker adicional (descomente e configure)
-  # worker-empresa-a:
+  # Exemplo para outro cliente:
+  #
+  # worker-cliente-a:
   #   build: .
   #   restart: always
-  #   env_file: .env
-  #   environment:
-  #     - COMPANY_NAME=EmpresaA
-  #     - PORT=3001 # Se precisar expor porta diferente
-  #   container_name: worker-empresa-a
+  #   container_name: worker-cliente-a
+  #   env_file:
+  #     - .env.cliente-a
+  #   ports:
+  #     - "3001:3001"
+  #   volumes:
+  #     - ./config/cliente-a:/usr/src/app/config
+  #     - ./logs/cliente-a:/usr/src/app/logs

@@ -1,4 +1,6 @@
 .env
 .env.imagemcor
 .env.univision
+.env.hvisao
 node_modules/
+config/*.json

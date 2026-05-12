@@ -1,155 +1,178 @@
-# ROBOZAP - Worker de Integração WhatsApp/SQL Server
+# ROBOZAP
 
-Worker modular em Node.js responsável por ler dados de agendamento de um banco de dados SQL Server e enviar mensagens de WhatsApp através da API PartnerBot.
+Worker Node.js para criar fila de mensagens a partir do SQL Server e enviar templates de WhatsApp pela API PartnerBot.
 
-O sistema foi projetado para operar em **múltiplos containers**, permitindo que você atenda várias empresas simultaneamente ("One Container, One Database"), garantindo isolamento e escalabilidade.
+O projeto foi pensado para operar por cliente: cada container usa seu proprio `.env`, banco, templates e configuracao operacional.
 
-## 🚀 Funcionalidades
+## Funcionalidades
 
-- **Envio de Boas-vindas**: Processa novos agendamentos criados no dia e envia confirmação.
-- **Confirmação de Agenda**: Envia lembretes automáticos 1 dia antes do agendamento.
-- **Logging Estruturado**: Logs coloridos no console e arquivos JSON (`logs/app.log`, `logs/error.log`) para fácil monitoramento.
-- **Multi-Tenant via Docker**: Suporte nativo a múltiplos containers rodando em paralelo, cada um conectado a um banco de dados distinto.
+- Envio da mensagem de agendamento realizado.
+- Envio da mensagem de confirmacao/lembrete perto da consulta.
+- Produtor opcional de fila: cria registros em `tblWhatsAppEnvio` a partir da `vwAgenda`.
+- Painel web em `/admin` com login, pausa/retomada, configuracoes operacionais e visualizacao da fila pendente.
+- Modo teste para restringir criacao/envio a pacientes com um texto no nome, por padrao `TESTE`.
+- Sincronizacao opcional de `tblAgenda.bolWhatsAppEnviado` apos sucesso no envio.
+- Logs em `logs/app.log` e `logs/error.log`.
 
-## 🛠️ Configuração
+## Fluxo
 
-O worker é configurado inteiramente via variáveis de ambiente.
+1. O produtor opcional busca agendamentos elegiveis na `vwAgenda`.
+2. Ele cria linhas ausentes em `tblWhatsAppEnvio` com `strTipo = 'agendainicio'`.
+3. O worker envia mensagens pendentes da fila.
+4. Ao enviar com sucesso, marca `tblWhatsAppEnvio`.
+5. Quando habilitado, tambem marca `tblAgenda.bolWhatsAppEnviado = 'S'`.
 
-### Variáveis Obrigatórias
+O produtor nao cria procedure, trigger ou job no banco. A logica fica versionada neste projeto.
 
-| Variável | Descrição | Exemplo |
-|----------|-----------|---------|
-| `PORT` | Porta do servidor de Health Check | `3000` |
-| `COMPANY_NAME` | Nome da empresa (para identificação nos logs) | `Minha Clinica` |
-| `DB_SERVER` | Endereço do Servidor SQL | `192.168.1.100` |
-| `DB_NAME` | Nome do Banco de Dados | `db_clinica` |
-| `DB_USER` | Usuário do Banco | `sa` |
-| `DB_PASSWORD` | Senha do Banco | `senha123` |
-| `URL` | Endpoint da API PartnerBot | `https://api.partnerbot...` |
-| `AUTH_TOKEN` | Token da API PartnerBot | `seu_token_aqui` |
-| `TEMPLATE_NEW_SCHEDULE` | Nome do template de novos agendamentos | `novoagendamento_2` |
-| `TEMPLATE_REMINDER` | Nome do template de lembretes | `templatelembretev2` |
+## Configuracao
 
-## 🐳 Como Rodar (Docker)
+Crie um `.env` a partir de `.env.example`.
 
-A estratégia recomendada é rodar um container separado para cada empresa que você atende.
+Variaveis principais:
 
-### 1. Construir a Imagem
+| Variavel | Descricao |
+| --- | --- |
+| `PORT` | Porta do servidor web e painel. |
+| `ADMIN_USER` | Usuario do painel `/admin`. |
+| `ADMIN_PASSWORD` | Senha do painel `/admin`. |
+| `RUNTIME_CONFIG_PATH` | Caminho do JSON persistente do painel. |
+| `DB_SERVER` | Host do SQL Server. |
+| `DB_NAME` | Nome do banco. |
+| `DB_USER` | Usuario do banco. |
+| `DB_PASSWORD` | Senha do banco. |
+| `URL` | Endpoint PartnerBot. |
+| `AUTH_TOKEN` | Token PartnerBot, incluindo `Bearer` quando aplicavel. |
+| `TEMPLATE_NEW_SCHEDULE` | Template da mensagem de agendamento realizado. |
+| `TEMPLATE_REMINDER` | Template da confirmacao/lembrete. |
+
+Configuracoes operacionais:
+
+| Variavel | Padrao | Descricao |
+| --- | --- | --- |
+| `PARTNERBOT_IS_CLOSED` | `true` | Valor enviado em `isClosed`. |
+| `PARTNERBOT_INCLUDE_COMPANY` | `true` | Inclui empresa nos parametros do template. |
+| `PARTNERBOT_INCLUDE_UNIT` | `true` | Inclui unidade/endereco nos parametros do template. |
+| `PARTNERBOT_INCLUDE_CONFIRMATION_BUTTON` | `true` | Inclui botao de confirmacao no template de lembrete. |
+| `BUSINESS_HOURS_START` | `8` | Hora inicial de envio no fuso de Sao Paulo. |
+| `BUSINESS_HOURS_END` | `17` | Hora final de envio no fuso de Sao Paulo. |
+| `QUEUE_PRODUCER_ENABLED` | `false` | Habilita criacao de fila a partir da agenda. |
+| `QUEUE_PRODUCER_LOOKAHEAD_DAYS` | `365` | Quantos dias futuros o produtor deve descobrir. |
+| `QUEUE_PRODUCER_LIMIT` | `25` | Maximo de linhas criadas por ciclo. |
+| `TEST_MODE_ENABLED` | `false` | Restringe produtor e envio ao filtro de teste. |
+| `TEST_PATIENT_NAME_FILTER` | `TESTE` | Texto usado no modo teste. |
+| `SYNC_AGENDA_WHATSAPP_STATUS` | `false` | Marca `tblAgenda.bolWhatsAppEnviado = 'S'` apos envio. |
+| `MESSAGING_START_DATE` | vazio | Data minima da consulta para criar fila/enviar, no formato `YYYY-MM-DD`. |
+| `SKIP_PAST_APPOINTMENT_TIME` | `false` | Bloqueia confirmacao/lembrete para consulta de hoje cujo horario ja passou. |
+| `OUTBOUND_SEND_START_DATE` | vazio | Data de liberacao dos disparos. Antes dela o worker monta fila, mas nao envia mensagens. |
+
+O painel salva alteracoes em `config/runtime-config.json`. Esse arquivo tem prioridade sobre o `.env` para as configuracoes operacionais.
+
+## Painel Admin
+
+Acesse:
+
+```text
+http://localhost:PORT/admin
+```
+
+No painel e possivel:
+
+- pausar e retomar o worker;
+- alterar templates e flags de payload;
+- ligar/desligar produtor de fila;
+- controlar janela e limite do produtor;
+- ligar modo teste;
+- ver a fila pendente.
+
+## Modo Teste
+
+Para testar sem enviar mensagens para pacientes reais:
+
+```env
+TEST_MODE_ENABLED=true
+TEST_PATIENT_NAME_FILTER=TESTE
+QUEUE_PRODUCER_LIMIT=5
+```
+
+Com isso, o produtor e o envio so usam pacientes cujo nome contenha `TESTE`.
+
+## Implantacao Segura
+
+Para um cliente sem produtor de fila no banco:
+
+1. Configure `.env`.
+2. Inicie com:
+
+```env
+QUEUE_PRODUCER_ENABLED=true
+QUEUE_PRODUCER_LOOKAHEAD_DAYS=365
+QUEUE_PRODUCER_LIMIT=5
+TEST_MODE_ENABLED=true
+MESSAGING_START_DATE=2026-05-09
+SKIP_PAST_APPOINTMENT_TIME=true
+OUTBOUND_SEND_START_DATE=2026-05-09
+```
+
+3. Valide no painel com pacientes de teste.
+4. Para producao gradual:
+
+```env
+TEST_MODE_ENABLED=false
+QUEUE_PRODUCER_LIMIT=25
+```
+
+5. Depois de estabilizar, aumente para `50` se necessario.
+
+## Rodar Localmente
+
+```bash
+npm install
+npm start
+```
+
+Ou em desenvolvimento:
+
+```bash
+npm run dev
+```
+
+## Docker
+
+Build:
+
 ```bash
 docker build -t robozap-worker .
 ```
 
-### 2. Criar Arquivos de Configuração
-Crie um arquivo `.env` para cada cliente (ex: `.env.clienteA`, `.env.clienteB`) preenchendo as variáveis listadas acima com os dados específicos daquele cliente.
-
-### 3. Iniciar os Containers
-Rode o comando abaixo para levantar os workers:
+Compose:
 
 ```bash
-# Worker para o Cliente A
-docker run -d \
-  --name worker-cliente-a \
-  --env-file .env.clienteA \
-  --restart always \
-  robozap-worker
-
-# Worker para o Cliente B
-docker run -d \
-  --name worker-cliente-b \
-  --env-file .env.clienteB \
-  --restart always \
-  robozap-worker
+docker compose up -d --build
 ```
 
-## 📝 Logs
+O `docker-compose.yml` monta:
 
-O sistema gera logs no diretório `/usr/src/app/logs` dentro do container.
+- `./config:/usr/src/app/config`, para persistir `runtime-config.json`;
+- `./logs:/usr/src/app/logs`, para persistir logs.
 
-- **Console**: Logs formatados e coloridos (visíveis via `docker logs worker-cliente-a`).
-- **Arquivo**: Logs em formato JSON para integração com sistemas de monitoramento.
+Para multiplos clientes, crie um servico por cliente com seu proprio `.env`, porta, pasta `config` e pasta `logs`.
 
-## 📦 Desenvolvimento
+## Observacoes de Banco
 
-Para rodar localmente:
-1. `npm install`
-2. Crie um arquivo `.env` na raiz.
-3. `npm start` ou `npm run dev` (com nodemon).
+O worker espera as tabelas/views:
 
----
+- `tblWhatsAppEnvio`
+- `vwAgenda`
+- `tblAgenda`
+- `tblEmpresa`
 
-# ROBOZAP - WhatsApp/SQL Server Integration Worker
+Para o controle atual, `tblWhatsAppEnvio` deve possuir:
 
-Modular Node.js worker responsible for reading appointment data from a SQL Server database and sending WhatsApp messages via the PartnerBot API.
+- `bolMensagemErro bit NOT NULL DEFAULT 0`
+- `bolConfirma char(1) NOT NULL DEFAULT 'N'`
 
-The system was designed to operate in **multiple containers**, allowing you to serve multiple companies simultaneously ("One Container, One Database"), ensuring isolation and scalability.
+Quando `SYNC_AGENDA_WHATSAPP_STATUS=true`, o worker atualiza:
 
-## 🚀 Features
-
-- **Welcome Message**: Processes new appointments created during the day and sends confirmation.
-- **Agenda Confirmation**: Automatically sends reminders 1 day before the appointment.
-- **Structured Logging**: Colored logs in the console and JSON files (`logs/app.log`, `logs/error.log`) for easy monitoring.
-- **Multi-Tenant via Docker**: Native support for multiple containers running in parallel, each connected to a distinct database.
-
-## 🛠️ Configuration
-
-The worker is fully configured via environment variables.
-
-### Required Variables
-
-| Variable | Description | Example |
-|----------|-----------|---------|
-| `PORT` | Health Check server port | `3000` |
-| `COMPANY_NAME` | Company name (for log identification) | `My Clinic` |
-| `DB_SERVER` | SQL Server Address | `192.168.1.100` |
-| `DB_NAME` | Database Name | `db_clinic` |
-| `DB_USER` | Database User | `sa` |
-| `DB_PASSWORD` | Database Password | `password123` |
-| `URL` | PartnerBot API Endpoint | `https://api.partnerbot...` |
-| `AUTH_TOKEN` | PartnerBot API Token | `your_token_here` |
-| `TEMPLATE_NEW_SCHEDULE` | New appointment template name | `novoagendamento_2` |
-| `TEMPLATE_REMINDER` | Reminder template name | `templatelembretev2` |
-
-## 🐳 How to Run (Docker)
-
-The recommended strategy is to run a separate container for each company you serve.
-
-### 1. Build the Image
-```bash
-docker build -t robozap-worker .
+```sql
+tblAgenda.bolWhatsAppEnviado = 'S'
 ```
-
-### 2. Create Configuration Files
-Create a `.env` file for each client (e.g., `.env.clientA`, `.env.clientB`) filling in the variables listed above with that client's specific data.
-
-### 3. Start the Containers
-Run the command below to start the workers:
-
-```bash
-# Worker for Client A
-docker run -d \
-  --name worker-client-a \
-  --env-file .env.clientA \
-  --restart always \
-  robozap-worker
-
-# Worker for Client B
-docker run -d \
-  --name worker-client-b \
-  --env-file .env.clientB \
-  --restart always \
-  robozap-worker
-```
-
-## 📝 Logs
-
-The system generates logs in the `/usr/src/app/logs` directory inside the container.
-
-- **Console**: Formatted and colored logs (visible via `docker logs worker-client-a`).
-- **File**: Logs in JSON format for integration with monitoring systems.
-
-## 📦 Development
-
-To run locally:
-1. `npm install`
-2. Create a `.env` file in the root.
-3. `npm start` or `npm run dev` (with nodemon).

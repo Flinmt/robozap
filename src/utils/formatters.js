@@ -1,14 +1,12 @@
 // ========================================================================
 // FORMATADORES E CONSTRUTORES DE PAYLOAD
 // ========================================================================
-// Este módulo é responsável por:
-// 1. Limpar e padronizar dados (texto, telefone).
-// 2. Montar a estrutura JSON exata que a API de envio (PartnerBot) espera.
-//    - Os payloads seguem o padrão do WhatsApp Cloud API (templateData).
+// Este modulo limpa os dados vindos do banco e monta o JSON que a PartnerBot
+// espera. O formato do payload vem da configuracao operacional ativa.
 
 /**
  * Remove quebras de linha, aspas e retorna "-" se for vazio/nulo.
- * @param {string} texto 
+ * @param {string} texto
  * @returns {string}
  */
 function limparTexto(texto) {
@@ -18,42 +16,55 @@ function limparTexto(texto) {
 }
 
 /**
- * Remove caracteres não numéricos.
- * @param {string} telefone 
+ * Remove caracteres nao numericos.
+ * @param {string} telefone
  * @returns {string}
  */
 function limparTelefone(telefone) {
     return String(telefone).replace(/\D/g, "");
 }
 
+function montarParametrosCorpo(dados, config) {
+    const parameters = [
+        { type: "text", text: dados.p_agenda },
+        { type: "text", text: dados.p_data },
+        { type: "text", text: dados.p_hora },
+        { type: "text", text: dados.p_profissional }
+    ];
+
+    if (config.includeCompany) {
+        parameters.push({ type: "text", text: dados.p_empresa });
+    }
+
+    if (config.includeUnit) {
+        parameters.push({ type: "text", text: dados.p_unidade });
+    }
+
+    return parameters;
+}
+
 /**
- * Monta o payload JSON para a API do PartnerBot.
- * @param {string} telefoneFinal 
- * @param {object} dados - Objeto com os campos p_agenda, p_data, etc.
+ * Monta o payload JSON para a mensagem de novo agendamento.
+ * @param {string} telefoneFinal
+ * @param {object} dados
+ * @param {object} config
  * @returns {object}
  */
-function montarPayloadAgendamento(telefoneFinal, dados) {
+function montarPayloadAgendamento(telefoneFinal, dados, config) {
     return {
         number: telefoneFinal,
-        isClosed: true,
+        isClosed: config.partnerbotIsClosed,
         templateData: {
             messaging_product: "whatsapp",
             to: telefoneFinal,
             type: "template",
             template: {
-                name: process.env.TEMPLATE_NEW_SCHEDULE,
+                name: config.templateNewSchedule,
                 language: { code: "pt_BR" },
                 components: [
                     {
                         type: "body",
-                        parameters: [
-                            { type: "text", text: dados.p_agenda },
-                            { type: "text", text: dados.p_data },
-                            { type: "text", text: dados.p_hora },
-                            { type: "text", text: dados.p_profissional },
-                            { type: "text", text: dados.p_empresa },
-                            { type: "text", text: dados.p_unidade }
-                        ]
+                        parameters: montarParametrosCorpo(dados, config)
                     }
                 ]
             }
@@ -62,44 +73,43 @@ function montarPayloadAgendamento(telefoneFinal, dados) {
 }
 
 /**
- * Monta o payload JSON para a mensagem de lembrete/confirmação.
- * @param {string} telefoneFinal 
- * @param {object} dados - Objeto com os campos formateados.
- * @param {string} link - URL para o botão.
+ * Monta o payload JSON para a mensagem de lembrete/confirmacao.
+ * @param {string} telefoneFinal
+ * @param {object} dados
+ * @param {string} link
+ * @param {object} config
  * @returns {object}
  */
-function montarPayloadConfirmacao(telefoneFinal, dados, link) {
+function montarPayloadConfirmacao(telefoneFinal, dados, link, config) {
+    const components = [
+        {
+            type: "body",
+            parameters: montarParametrosCorpo(dados, config)
+        }
+    ];
+
+    if (config.includeConfirmationButton) {
+        components.push({
+            type: "button",
+            sub_type: "url",
+            index: "0",
+            parameters: [
+                { type: "text", text: link }
+            ]
+        });
+    }
+
     return {
         number: telefoneFinal,
-        isClosed: true,
+        isClosed: config.partnerbotIsClosed,
         templateData: {
             messaging_product: "whatsapp",
             to: telefoneFinal,
             type: "template",
             template: {
-                name: process.env.TEMPLATE_REMINDER,
+                name: config.templateReminder,
                 language: { code: "pt_BR" },
-                components: [
-                    {
-                        type: "body",
-                        parameters: [
-                            { type: "text", text: dados.p_agenda },
-                            { type: "text", text: dados.p_data },
-                            { type: "text", text: dados.p_hora },
-                            { type: "text", text: dados.p_profissional },
-                            { type: "text", text: dados.p_empresa },
-                            { type: "text", text: dados.p_unidade }
-                        ]
-                    },
-                    {
-                        type: "button",
-                        sub_type: "url",
-                        index: "0",
-                        parameters: [
-                            { type: "text", text: link }
-                        ]
-                    }
-                ]
+                components
             }
         }
     };
