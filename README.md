@@ -43,6 +43,7 @@ Variaveis principais:
 | `DB_USER` | Usuario do banco. |
 | `DB_PASSWORD` | Senha do banco. |
 | `URL` | Endpoint PartnerBot. |
+| `SHOWTICKET_URL` | Endpoint opcional para consulta de ticket aberto (`isClosed` dinamico). |
 | `AUTH_TOKEN` | Token PartnerBot, incluindo `Bearer` quando aplicavel. |
 | `TEMPLATE_NEW_SCHEDULE` | Template da mensagem de agendamento realizado. |
 | `TEMPLATE_REMINDER` | Template da confirmacao/lembrete. |
@@ -61,6 +62,8 @@ Configuracoes operacionais:
 | `QUEUE_PRODUCER_LOOKAHEAD_DAYS` | `365` | Quantos dias futuros o produtor deve descobrir. |
 | `QUEUE_PRODUCER_LIMIT` | `25` | Maximo de linhas criadas por ciclo. |
 | `SEND_INTERVAL_SECONDS` | `10` | Tempo de espera entre envios de mensagens no worker. |
+| `USE_TICKET_OPEN_FOR_IS_CLOSED` | `false` | Se `true`, consulta ticket aberto e define `isClosed` dinamicamente. |
+| `NORMALIZE_BRAZIL_MOBILE_NINTH_DIGIT` | `true` | Remove o 9o digito do celular BR quando aplicavel. |
 | `TEST_MODE_ENABLED` | `false` | Restringe produtor e envio ao filtro de teste. |
 | `TEST_PATIENT_NAME_FILTER` | `TESTE` | Texto usado no modo teste. |
 | `SYNC_AGENDA_WHATSAPP_STATUS` | `false` | Marca `tblAgenda.bolWhatsAppEnviado = 'S'` apos envio. |

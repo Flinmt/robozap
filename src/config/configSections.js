@@ -9,7 +9,9 @@ function toSections(flat) {
             reminder: String(flat.templateReminder || '')
         },
         integration: {
-            partnerbotAuthToken: String(flat.partnerbotAuthToken || '')
+            partnerbotAuthToken: String(flat.partnerbotAuthToken || ''),
+            useTicketOpenForIsClosed: Boolean(flat.useTicketOpenForIsClosed),
+            normalizeBrazilMobileNinthDigit: Boolean(flat.normalizeBrazilMobileNinthDigit)
         },
         businessHours: {
             start: Number(flat.businessHoursStart),
@@ -65,6 +67,12 @@ function validateSection(section, payload) {
         if (typeof payload.partnerbotAuthToken !== 'string') {
             pushError('partnerbotAuthToken', 'VALIDATION_PARTNERBOT_AUTH_TOKEN', 'Token da PartnerBot invalido.');
         }
+        if (typeof payload.useTicketOpenForIsClosed !== 'boolean') {
+            pushError('useTicketOpenForIsClosed', 'VALIDATION_USE_TICKET_IS_CLOSED', 'Flag de ticket para isClosed deve ser booleana.');
+        }
+        if (typeof payload.normalizeBrazilMobileNinthDigit !== 'boolean') {
+            pushError('normalizeBrazilMobileNinthDigit', 'VALIDATION_NORMALIZE_MOBILE_NINTH_DIGIT', 'Flag de normalizacao do 9o digito deve ser booleana.');
+        }
     }
 
     if (section === 'businessHours') {
@@ -104,7 +112,11 @@ function validateSection(section, payload) {
 function toFlatPatch(section, payload) {
     if (section === 'client') return { clientName: payload.name, clientCode: payload.code };
     if (section === 'templates') return { templateNewSchedule: payload.newSchedule, templateReminder: payload.reminder };
-    if (section === 'integration') return { partnerbotAuthToken: payload.partnerbotAuthToken };
+    if (section === 'integration') return {
+        partnerbotAuthToken: payload.partnerbotAuthToken,
+        useTicketOpenForIsClosed: payload.useTicketOpenForIsClosed,
+        normalizeBrazilMobileNinthDigit: payload.normalizeBrazilMobileNinthDigit
+    };
     if (section === 'businessHours') return {
         businessHoursStart: payload.start,
         businessHoursEnd: payload.end,

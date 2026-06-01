@@ -414,6 +414,14 @@ function renderAdminPage(basePath) {
                 <input id="partnerbotAuthToken" name="partnerbotAuthToken" type="text" autocomplete="off" placeholder="Bearer ...">
                 <small class="helper">Se preenchido, sobrescreve o token do .env para esta instancia.</small>
               </div>
+              <label class="toggle">
+                <input id="useTicketOpenForIsClosed" name="useTicketOpenForIsClosed" type="checkbox">
+                <span>isClosed dinamico por ticket<small>Consulta showticket antes de enviar para definir fechamento automatico.</small></span>
+              </label>
+              <label class="toggle">
+                <input id="normalizeBrazilMobileNinthDigit" name="normalizeBrazilMobileNinthDigit" type="checkbox">
+                <span>Normalizar 9o digito do celular BR<small>Remove o 9o digito do celular quando aplicavel (regra Imagemcor).</small></span>
+              </label>
             </div>
           </div>
 
@@ -594,6 +602,8 @@ function renderAdminPage(basePath) {
       'templateNewSchedule',
       'templateReminder',
       'partnerbotAuthToken',
+      'useTicketOpenForIsClosed',
+      'normalizeBrazilMobileNinthDigit',
       'partnerbotIsClosed',
       'includeCompany',
       'includeUnit',

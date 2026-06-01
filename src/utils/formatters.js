@@ -20,8 +20,26 @@ function limparTexto(texto) {
  * @param {string} telefone
  * @returns {string}
  */
-function limparTelefone(telefone) {
-    return String(telefone).replace(/\D/g, "");
+function limparTelefone(telefone, config = {}) {
+    const apenasDigitos = String(telefone).replace(/\D/g, "");
+
+    if (!config.normalizeBrazilMobileNinthDigit) {
+        return apenasDigitos;
+    }
+
+    if (apenasDigitos.startsWith("55")) {
+        const numeroNacional = apenasDigitos.slice(2);
+        if (numeroNacional.length === 11 && numeroNacional[2] === "9") {
+            return "55" + numeroNacional.slice(0, 2) + numeroNacional.slice(3);
+        }
+        return apenasDigitos;
+    }
+
+    if (apenasDigitos.length === 11 && apenasDigitos[2] === "9") {
+        return apenasDigitos.slice(0, 2) + apenasDigitos.slice(3);
+    }
+
+    return apenasDigitos;
 }
 
 function montarParametrosCorpo(dados, config) {

@@ -38,6 +38,7 @@ const PORT = process.env.PORT || 3000;
 const BASE_PATH = normalizeBasePath(process.env.BASE_PATH || '');
 const PARTNERBOT_URL = process.env.URL;
 const AUTH_TOKEN = process.env.AUTH_TOKEN;
+const SHOWTICKET_URL = process.env.SHOWTICKET_URL || (PARTNERBOT_URL ? PARTNERBOT_URL.replace(/\/template$/, '/showticket') : null);
 const COMPANY_NAME = process.env.COMPANY_NAME || null;
 const INTERVALO_CHECK = 10000;
 
@@ -51,7 +52,7 @@ if (COMPANY_NAME) {
     logger.info('Worker rodando para TODAS as empresas (Modo Global)');
 }
 
-const botService = new PartnerBotService(PARTNERBOT_URL, AUTH_TOKEN);
+const botService = new PartnerBotService(PARTNERBOT_URL, AUTH_TOKEN, SHOWTICKET_URL);
 
 let isProcessing = false;
 let ultimoLogForaHorario = 0;
@@ -452,14 +453,22 @@ async function processarFila() {
 
             for (const msg of mensagens) {
                 try {
-                    const telefoneFinal = formatters.limparTelefone(msg.strtelefone);
+                    const telefoneFinal = formatters.limparTelefone(msg.strtelefone, config);
 
                     if (!telefoneFinal || telefoneFinal.length < 10) {
                         throw new Error(`Numero invalido: '${telefoneFinal}'`);
                     }
 
                     const dadosFormatados = montarDadosFormatados(msg);
-                    const payload = formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados, config);
+                    let isClosed = config.partnerbotIsClosed;
+
+                    if (config.useTicketOpenForIsClosed) {
+                        const ticket = await botService.verificarTicketAberto(telefoneFinal);
+                        isClosed = !ticket.encontrado;
+                        logger.info(`[TicketCheck] Agendamento ID ${msg.intWhatsAppEnvioId} numero=${telefoneFinal} ticketAberto=${ticket.encontrado}`);
+                    }
+
+                    const payload = formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados, { ...config, partnerbotIsClosed: isClosed });
 
                     logger.info(`Enviando Agendamento ID ${msg.intWhatsAppEnvioId}...`);
                     await botService.enviarMensagem(payload);
@@ -489,7 +498,7 @@ async function processarFila() {
 
             for (const msg of confirmacoes) {
                 try {
-                    const telefoneFinal = formatters.limparTelefone(msg.strtelefone);
+                    const telefoneFinal = formatters.limparTelefone(msg.strtelefone, config);
 
                     if (!telefoneFinal || telefoneFinal.length < 10) {
                         throw new Error(`Numero invalido: '${telefoneFinal}'`);
@@ -497,7 +506,15 @@ async function processarFila() {
 
                     const dadosFormatados = montarDadosFormatados(msg);
                     const linkBotao = msg.Link || '-';
-                    const payload = formatters.montarPayloadConfirmacao(telefoneFinal, dadosFormatados, linkBotao, config);
+                    let isClosed = config.partnerbotIsClosed;
+
+                    if (config.useTicketOpenForIsClosed) {
+                        const ticket = await botService.verificarTicketAberto(telefoneFinal);
+                        isClosed = !ticket.encontrado;
+                        logger.info(`[TicketCheck] Lembrete ID ${msg.intWhatsAppEnvioId} numero=${telefoneFinal} ticketAberto=${ticket.encontrado}`);
+                    }
+
+                    const payload = formatters.montarPayloadConfirmacao(telefoneFinal, dadosFormatados, linkBotao, { ...config, partnerbotIsClosed: isClosed });
 
                     logger.info(`Enviando Lembrete ID ${msg.intWhatsAppEnvioId}...`);
                     await botService.enviarMensagem(payload);
