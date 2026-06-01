@@ -35,6 +35,8 @@ Variaveis principais:
 | `PORT` | Porta do servidor web e painel. |
 | `ADMIN_USER` | Usuario do painel `/admin`. |
 | `ADMIN_PASSWORD` | Senha do painel `/admin`. |
+| `CLIENT_NAME` | Nome do cliente exibido no topo do painel admin. |
+| `CLIENT_CODE` | Codigo interno opcional do cliente no painel admin. |
 | `RUNTIME_CONFIG_PATH` | Caminho do JSON persistente do painel. |
 | `DB_SERVER` | Host do SQL Server. |
 | `DB_NAME` | Nome do banco. |
@@ -58,6 +60,7 @@ Configuracoes operacionais:
 | `QUEUE_PRODUCER_ENABLED` | `false` | Habilita criacao de fila a partir da agenda. |
 | `QUEUE_PRODUCER_LOOKAHEAD_DAYS` | `365` | Quantos dias futuros o produtor deve descobrir. |
 | `QUEUE_PRODUCER_LIMIT` | `25` | Maximo de linhas criadas por ciclo. |
+| `SEND_INTERVAL_SECONDS` | `10` | Tempo de espera entre envios de mensagens no worker. |
 | `TEST_MODE_ENABLED` | `false` | Restringe produtor e envio ao filtro de teste. |
 | `TEST_PATIENT_NAME_FILTER` | `TESTE` | Texto usado no modo teste. |
 | `SYNC_AGENDA_WHATSAPP_STATUS` | `false` | Marca `tblAgenda.bolWhatsAppEnviado = 'S'` apos envio. |
@@ -78,11 +81,40 @@ http://localhost:PORT/admin
 No painel e possivel:
 
 - pausar e retomar o worker;
+- identificar para qual cliente o painel atual esta configurado;
 - alterar templates e flags de payload;
+- sobrescrever o token da PartnerBot por cliente (quando necessario);
 - ligar/desligar produtor de fila;
 - controlar janela e limite do produtor;
 - ligar modo teste;
 - ver a fila pendente.
+
+## Validacao Rapida de Historico e Rollback
+
+Exemplo em PowerShell (ajuste host/credenciais conforme ambiente):
+
+```powershell
+$base = 'http://localhost:3002/hvisao'
+$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+
+# 1) Login no painel
+Invoke-WebRequest -Method Post -Uri "$base/admin/login" -WebSession $session -ContentType 'application/x-www-form-urlencoded' -Body 'user=admin&password=admin' | Out-Null
+
+# 2) Altera uma secao (safety)
+$body = @{ paused = $true; testModeEnabled = $false; testPatientNameFilter = 'TESTE'; syncAgendaWhatsappStatus = $true } | ConvertTo-Json
+Invoke-RestMethod -Method Put -Uri "$base/api/admin/config/safety" -WebSession $session -ContentType 'application/json' -Body $body
+
+# 3) Consulta historico
+Invoke-RestMethod -Method Get -Uri "$base/api/admin/config/history?limit=5&offset=0" -WebSession $session
+
+# 4) Reverte ultimo evento
+Invoke-RestMethod -Method Post -Uri "$base/api/admin/config/revert/last" -WebSession $session
+```
+
+Endpoints de auditoria disponiveis:
+
+- `GET /api/admin/config/history?limit=&offset=`
+- `POST /api/admin/config/revert/last`
 
 ## Modo Teste
 

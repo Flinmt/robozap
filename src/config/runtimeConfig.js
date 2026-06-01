@@ -35,9 +35,12 @@ function parseDateString(value, fallback = '') {
 
 function getDefaults() {
     return {
-        paused: parseBoolean(process.env.WORKER_PAUSED, false),
+        clientName: process.env.CLIENT_NAME || process.env.COMPANY_NAME || '',
+        clientCode: process.env.CLIENT_CODE || process.env.DB_NAME || '',
+        paused: parseBoolean(process.env.WORKER_PAUSED, true),
         templateNewSchedule: process.env.TEMPLATE_NEW_SCHEDULE || '',
         templateReminder: process.env.TEMPLATE_REMINDER || '',
+        partnerbotAuthToken: '',
         partnerbotIsClosed: parseBoolean(process.env.PARTNERBOT_IS_CLOSED, true),
         includeCompany: parseBoolean(process.env.PARTNERBOT_INCLUDE_COMPANY, true),
         includeUnit: parseBoolean(process.env.PARTNERBOT_INCLUDE_UNIT, true),
@@ -47,6 +50,7 @@ function getDefaults() {
         queueProducerEnabled: parseBoolean(process.env.QUEUE_PRODUCER_ENABLED, false),
         queueProducerLookaheadDays: parseInteger(process.env.QUEUE_PRODUCER_LOOKAHEAD_DAYS, 7, 0, 365),
         queueProducerLimit: parseInteger(process.env.QUEUE_PRODUCER_LIMIT, 50, 1, 500),
+        sendIntervalSeconds: parseInteger(process.env.SEND_INTERVAL_SECONDS, 10, 0, 300),
         testModeEnabled: parseBoolean(process.env.TEST_MODE_ENABLED, false),
         testPatientNameFilter: process.env.TEST_PATIENT_NAME_FILTER || 'TESTE',
         syncAgendaWhatsappStatus: parseBoolean(process.env.SYNC_AGENDA_WHATSAPP_STATUS, false),
@@ -72,9 +76,12 @@ function normalizeConfig(input) {
     const merged = { ...defaults, ...input };
 
     return {
+        clientName: String(merged.clientName || ''),
+        clientCode: String(merged.clientCode || ''),
         paused: parseBoolean(merged.paused, defaults.paused),
         templateNewSchedule: String(merged.templateNewSchedule || ''),
         templateReminder: String(merged.templateReminder || ''),
+        partnerbotAuthToken: String(merged.partnerbotAuthToken || ''),
         partnerbotIsClosed: parseBoolean(merged.partnerbotIsClosed, defaults.partnerbotIsClosed),
         includeCompany: parseBoolean(merged.includeCompany, defaults.includeCompany),
         includeUnit: parseBoolean(merged.includeUnit, defaults.includeUnit),
@@ -84,6 +91,7 @@ function normalizeConfig(input) {
         queueProducerEnabled: parseBoolean(merged.queueProducerEnabled, defaults.queueProducerEnabled),
         queueProducerLookaheadDays: parseInteger(merged.queueProducerLookaheadDays, defaults.queueProducerLookaheadDays, 0, 365),
         queueProducerLimit: parseInteger(merged.queueProducerLimit, defaults.queueProducerLimit, 1, 500),
+        sendIntervalSeconds: parseInteger(merged.sendIntervalSeconds, defaults.sendIntervalSeconds, 0, 300),
         testModeEnabled: parseBoolean(merged.testModeEnabled, defaults.testModeEnabled),
         testPatientNameFilter: String(merged.testPatientNameFilter || defaults.testPatientNameFilter),
         syncAgendaWhatsappStatus: parseBoolean(merged.syncAgendaWhatsappStatus, defaults.syncAgendaWhatsappStatus),
