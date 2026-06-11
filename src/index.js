@@ -52,6 +52,23 @@ if (COMPANY_NAME) {
     logger.info('Worker rodando para TODAS as empresas (Modo Global)');
 }
 
+function isInitialConfigPending(config) {
+    return config.paused || !config.clientName || !config.templateNewSchedule;
+}
+
+function logInitialConfigWarning() {
+    try {
+        const config = runtimeConfig.getConfig();
+        if (!isInitialConfigPending(config)) return;
+
+        logger.warn('Configuracao inicial pendente. Acesse o painel admin para configurar cliente, templates e formato do payload. Worker iniciado pausado e em modo teste por seguranca.');
+    } catch (error) {
+        logger.warn(`Configuracao inicial pendente. Falha ao ler runtime config: ${error.message}`);
+    }
+}
+
+logInitialConfigWarning();
+
 const botService = new PartnerBotService(PARTNERBOT_URL, AUTH_TOKEN, SHOWTICKET_URL);
 
 let isProcessing = false;
@@ -346,13 +363,21 @@ app.put(withBasePath(BASE_PATH, '/api/admin/config/:section'), requireAdmin(BASE
 app.listen(PORT, () => logger.info(`Servidor Web monitorando na porta ${PORT} com BASE_PATH='${BASE_PATH || '/'}'`));
 
 function montarDadosFormatados(msg) {
+    const config = runtimeConfig.getConfig();
+    const agendaUnitAddress = config.useAgendaUnitAddress ? msg.strunidade : '';
+    const fallbackAddress = config.defaultUnitAddress || `${msg.strEndereco || ''}, ${msg.strNumero || 'S/N'} - ${msg.strBairro || ''} - ${msg.strEstado || ''}`;
+
     return {
         p_agenda: formatters.limparTexto(msg.strAgenda),
         p_data: formatters.limparTexto(msg.datagenda),
-        p_hora: formatters.limparTexto(msg.strHora),
+        p_hora: config.formatTurnSchedule
+            ? formatters.formatarHorario(msg.strHora, msg.bolAtendeHoraMarcada)
+            : formatters.limparTexto(msg.strHora),
         p_profissional: formatters.limparTexto(msg.strProfissional),
+        p_especialidade: formatters.limparTexto(msg.strEspecialidadeMedica),
+        p_nome_unidade: formatters.limparTexto(msg.nomeUnidade || msg.strEmpresa),
         p_empresa: formatters.limparTexto(msg.strEmpresa),
-        p_unidade: formatters.limparTexto(`${msg.strEndereco || ''}, ${msg.strNumero || 'S/N'} - ${msg.strBairro || ''} - ${msg.strEstado || ''}`)
+        p_unidade: formatters.limparTexto(agendaUnitAddress || fallbackAddress)
     };
 }
 
@@ -445,8 +470,14 @@ async function processarFila() {
             return;
         }
 
-        const mensagens = await repository.buscarMensagensPendentes(config);
+        const mensagens = config.templateNewSchedule
+            ? await repository.buscarMensagensPendentes(config)
+            : [];
         totalAgendamentos = mensagens.length;
+
+        if (!config.templateNewSchedule) {
+            logger.warn('Template de agendamento nao configurado. Envio de novas mensagens bloqueado.');
+        }
 
         if (mensagens.length > 0) {
             logger.info(`Encontradas ${mensagens.length} novas mensagens.`);
@@ -490,8 +521,14 @@ async function processarFila() {
             }
         }
 
-        const confirmacoes = await repository.buscarConfirmacoesPendentes(config);
+        const confirmacoes = config.templateReminder
+            ? await repository.buscarConfirmacoesPendentes(config)
+            : [];
         totalConfirmacoes = confirmacoes.length;
+
+        if (!config.templateReminder) {
+            logger.warn('Template de confirmacao nao configurado. Envio de lembretes bloqueado.');
+        }
 
         if (confirmacoes.length > 0) {
             logger.info(`Encontrados ${confirmacoes.length} lembretes para enviar.`);

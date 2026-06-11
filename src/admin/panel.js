@@ -514,6 +514,10 @@ function renderAdminPage(basePath) {
                 <span>Enviar com isClosed=true<small>Controla o estado da conversa na PartnerBot.</small></span>
               </label>
               <label class="toggle">
+                <input id="includeProcedure" name="includeProcedure" type="checkbox">
+                <span>Incluir especialidade/procedimento<small>Adiciona especialidade da vwAgenda como parametro do template.</small></span>
+              </label>
+              <label class="toggle">
                 <input id="includeCompany" name="includeCompany" type="checkbox">
                 <span>Incluir empresa no corpo<small>Adiciona empresa como parametro do template.</small></span>
               </label>
@@ -525,6 +529,19 @@ function renderAdminPage(basePath) {
                 <input id="includeConfirmationButton" name="includeConfirmationButton" type="checkbox">
                 <span>Incluir botao de confirmacao<small>Envia o token dinamico para a URL do template.</small></span>
               </label>
+              <label class="toggle">
+                <input id="formatTurnSchedule" name="formatTurnSchedule" type="checkbox">
+                <span>Formatar horario por turno<small>Usa bolAtendeHoraMarcada para exibir ordem de chegada como na Imagemcor.</small></span>
+              </label>
+              <label class="toggle">
+                <input id="useAgendaUnitAddress" name="useAgendaUnitAddress" type="checkbox">
+                <span>Usar endereco da agenda<small>Usa vwAgenda.strUnidade antes do endereco padrao.</small></span>
+              </label>
+              <div>
+                <label for="defaultUnitAddress">Endereco padrao da unidade</label>
+                <input id="defaultUnitAddress" name="defaultUnitAddress" type="text" placeholder="Ex.: Rua Exemplo, 123 - Centro">
+                <small class="helper">Usado quando o template inclui unidade/endereco e a agenda nao fornece strUnidade.</small>
+              </div>
               <label class="toggle">
                 <input id="syncAgendaWhatsappStatus" name="syncAgendaWhatsappStatus" type="checkbox">
                 <span>Sincronizar status na agenda<small>Marca WhatsApp enviado apos sucesso.</small></span>
@@ -605,9 +622,13 @@ function renderAdminPage(basePath) {
       'useTicketOpenForIsClosed',
       'normalizeBrazilMobileNinthDigit',
       'partnerbotIsClosed',
+      'includeProcedure',
       'includeCompany',
       'includeUnit',
       'includeConfirmationButton',
+      'defaultUnitAddress',
+      'formatTurnSchedule',
+      'useAgendaUnitAddress',
       'businessHoursStart',
       'businessHoursEnd',
       'queueProducerEnabled',

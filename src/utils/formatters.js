@@ -15,6 +15,25 @@ function limparTexto(texto) {
     return textoLimpo === "" ? "-" : textoLimpo;
 }
 
+function formatarHorario(horario, bolAtendeHoraMarcada) {
+    if (!bolAtendeHoraMarcada || String(bolAtendeHoraMarcada).toUpperCase() === 'S') {
+        return limparTexto(horario);
+    }
+
+    const horaLimpa = limparTexto(horario);
+    if (horaLimpa === '-') return "Por Ordem de Chegada";
+
+    const match = horaLimpa.match(/^(\d{1,2})/);
+    if (!match) return "Por Ordem de Chegada";
+
+    const horaInt = parseInt(match[1], 10);
+    let turno = "Noite";
+    if (horaInt >= 0 && horaInt <= 11) turno = "Manhã";
+    else if (horaInt >= 12 && horaInt <= 17) turno = "Tarde";
+
+    return `${horaLimpa} - ${turno} - Por Ordem de Chegada`;
+}
+
 /**
  * Remove caracteres nao numericos.
  * @param {string} telefone
@@ -50,8 +69,12 @@ function montarParametrosCorpo(dados, config) {
         { type: "text", text: dados.p_profissional }
     ];
 
+    if (config.includeProcedure) {
+        parameters.push({ type: "text", text: dados.p_especialidade });
+    }
+
     if (config.includeCompany) {
-        parameters.push({ type: "text", text: dados.p_empresa });
+        parameters.push({ type: "text", text: dados.p_nome_unidade || dados.p_empresa });
     }
 
     if (config.includeUnit) {
@@ -135,6 +158,7 @@ function montarPayloadConfirmacao(telefoneFinal, dados, link, config) {
 
 module.exports = {
     limparTexto,
+    formatarHorario,
     limparTelefone,
     montarPayloadAgendamento,
     montarPayloadConfirmacao

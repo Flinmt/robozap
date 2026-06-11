@@ -34,9 +34,13 @@ function toSections(flat) {
         },
         payload: {
             partnerbotIsClosed: Boolean(flat.partnerbotIsClosed),
+            includeProcedure: Boolean(flat.includeProcedure),
             includeCompany: Boolean(flat.includeCompany),
             includeUnit: Boolean(flat.includeUnit),
-            includeConfirmationButton: Boolean(flat.includeConfirmationButton)
+            includeConfirmationButton: Boolean(flat.includeConfirmationButton),
+            defaultUnitAddress: String(flat.defaultUnitAddress || ''),
+            formatTurnSchedule: Boolean(flat.formatTurnSchedule),
+            useAgendaUnitAddress: Boolean(flat.useAgendaUnitAddress)
         }
     };
 }
@@ -101,9 +105,12 @@ function validateSection(section, payload) {
     }
 
     if (section === 'payload') {
-        ['partnerbotIsClosed', 'includeCompany', 'includeUnit', 'includeConfirmationButton'].forEach((field) => {
+        ['partnerbotIsClosed', 'includeProcedure', 'includeCompany', 'includeUnit', 'includeConfirmationButton', 'formatTurnSchedule', 'useAgendaUnitAddress'].forEach((field) => {
             if (typeof payload[field] !== 'boolean') pushError(field, 'VALIDATION_PAYLOAD_FIELD', `${field} deve ser booleano.`);
         });
+        if (typeof payload.defaultUnitAddress !== 'string') {
+            pushError('defaultUnitAddress', 'VALIDATION_DEFAULT_UNIT_ADDRESS', 'Endereco padrao deve ser texto.');
+        }
     }
 
     return errors;
@@ -134,9 +141,13 @@ function toFlatPatch(section, payload) {
     };
     if (section === 'payload') return {
         partnerbotIsClosed: payload.partnerbotIsClosed,
+        includeProcedure: payload.includeProcedure,
         includeCompany: payload.includeCompany,
         includeUnit: payload.includeUnit,
-        includeConfirmationButton: payload.includeConfirmationButton
+        includeConfirmationButton: payload.includeConfirmationButton,
+        defaultUnitAddress: payload.defaultUnitAddress,
+        formatTurnSchedule: payload.formatTurnSchedule,
+        useAgendaUnitAddress: payload.useAgendaUnitAddress
     };
     return null;
 }

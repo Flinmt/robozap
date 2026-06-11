@@ -5,6 +5,11 @@ class MessageRepository {
         this.pool = pool;
     }
 
+    getCompanyName(config = {}) {
+        const companyName = String(config.companyName || config.clientName || '').trim();
+        return companyName || null;
+    }
+
     async gerarFilaAgendamentos(config) {
         const queryInsert = `
             DECLARE @created TABLE (intWhatsAppEnvioId int);
@@ -40,6 +45,7 @@ class MessageRepository {
                 a.strProfissional,
                 a.strProcedimento
             FROM vwAgenda a
+            LEFT JOIN tblEmpresa E ON E.intEmpresaId = a.intEmpresaId
             CROSS APPLY (
                 SELECT telefoneLimpo = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(a.strTelefone, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', ''), '/', '')
             ) telefone
@@ -64,6 +70,7 @@ class MessageRepository {
               AND LEN(phone.finalPhone) >= 10
               AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
               AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, DATEADD(DAY, @lookaheadDays, GETDATE()))
+              AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, E.strEmpresa)))) = UPPER(@companyName))
               AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
               AND (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
               AND NOT EXISTS (
@@ -82,6 +89,7 @@ class MessageRepository {
             .input('lookaheadDays', sql.Int, config.queueProducerLookaheadDays)
             .input('testModeEnabled', sql.Bit, config.testModeEnabled ? 1 : 0)
             .input('testNameFilter', sql.VarChar, `%${config.testPatientNameFilter}%`)
+            .input('companyName', sql.VarChar, this.getCompanyName(config))
             .input('messagingStartDate', sql.Date, config.messagingStartDate || null)
             .query(queryInsert);
 
@@ -104,7 +112,10 @@ class MessageRepository {
                     a.datAgendamento,
                     a.strHora,
                     a.strProfissional,
-                    E.strEmpresa,
+                    a.strEspecialidadeMedica,
+                    a.bolAtendeHoraMarcada,
+                    COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa,
+                    COALESCE(a.strUnidade, '') AS strunidade,
                     CASE
                         WHEN IsNull(w.bolEnviado,'N') NOT IN ('S')
                          AND w.bolMensagemErro = 0
@@ -134,13 +145,15 @@ class MessageRepository {
                     END AS tipoFila
                 FROM tblWhatsAppEnvio W
                 INNER JOIN vwAgenda a ON a.intAgendaId = w.intAgendaId
-                INNER JOIN tblAgenda TA ON TA.intAgendaId = w.intAgendaId
-                INNER JOIN tblEmpresa E ON E.intEmpresaId = TA.intUnidadeId
+                LEFT JOIN tblAgenda TA ON TA.intAgendaId = w.intAgendaId
+                LEFT JOIN tblEmpresa EUnidade ON EUnidade.intEmpresaId = TA.intUnidadeId
+                LEFT JOIN tblEmpresa EVw ON EVw.intEmpresaId = a.intEmpresaId
                 WHERE w.bolMensagemErro = 0
                   AND (
                     IsNull(w.bolEnviado,'N') NOT IN ('S')
                     OR IsNull(w.bolConfirma,'N') NOT IN ('S')
                   )
+                  AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
                   AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
                   AND (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
             )
@@ -156,7 +169,10 @@ class MessageRepository {
                 datagenda,
                 strHora,
                 strProfissional,
+                strEspecialidadeMedica,
+                bolAtendeHoraMarcada,
                 strEmpresa,
+                strunidade,
                 tipoFila
             FROM fila
             WHERE tipoFila IN ('agendamento', 'confirmacao')
@@ -166,6 +182,7 @@ class MessageRepository {
         const result = await this.pool.request()
             .input('testModeEnabled', sql.Bit, config.testModeEnabled ? 1 : 0)
             .input('testNameFilter', sql.VarChar, `%${config.testPatientNameFilter}%`)
+            .input('companyName', sql.VarChar, this.getCompanyName(config))
             .input('messagingStartDate', sql.Date, config.messagingStartDate || null)
             .input('skipPastAppointmentTime', sql.Bit, config.skipPastAppointmentTime ? 1 : 0)
             .query(querySelect);
@@ -189,21 +206,23 @@ class MessageRepository {
                 convert(varchar, a.datAgendamento, 103) as datagenda, 
                 a.strHora, 
                 a.strProfissional,
-                E.strEmpresa,
-                E.strEndereco,
-                E.strNumero,
-                E.strBairro,
-                E.strEstado,
+                a.strEspecialidadeMedica,
+                a.bolAtendeHoraMarcada,
+                COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa,
+                COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS nomeUnidade,
+                a.strUnidade AS strunidade,
                 dbo.fncBase64_Encode(CONVERT(VARCHAR, w.intagendaid) + '-' + CONVERT(VARCHAR, GETDATE(), 120)) AS Link
             from tblWhatsAppEnvio W
             inner join vwAgenda a on a.intAgendaId = w.intAgendaId
-            inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
-            inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  
+            left join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
+            left join tblEmpresa EUnidade on EUnidade.intEmpresaId = TA.intUnidadeId
+            left join tblEmpresa EVw on EVw.intEmpresaId = a.intEmpresaId  
             where IsNull(w.bolEnviado,'N') NOT IN ('S') 
             and w.bolMensagemErro = 0
             and w.strTipo IN ('AgendaInicio', 'agendainicio')
             and len(w.strTelefone) >= 10 
             and CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE())
+            and (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
             and (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
             and (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter OR W.strAgenda LIKE @testNameFilter)
             order by a.datAgendamento
@@ -212,6 +231,7 @@ class MessageRepository {
         const result = await this.pool.request()
             .input('testModeEnabled', sql.Bit, config.testModeEnabled ? 1 : 0)
             .input('testNameFilter', sql.VarChar, `%${config.testPatientNameFilter || 'TESTE'}%`)
+            .input('companyName', sql.VarChar, this.getCompanyName(config))
             .input('messagingStartDate', sql.Date, config.messagingStartDate || null)
             .query(querySelect);
         return result.recordset;
@@ -232,19 +252,24 @@ class MessageRepository {
                 convert(varchar, a.datAgendamento, 103) as datagenda, 
                 a.strHora, 
                 a.strProfissional,
-                E.strEmpresa,
-                E.strEndereco,
-                E.strNumero,
-                E.strBairro,
-                E.strEstado,
+                a.strEspecialidadeMedica,
+                a.bolAtendeHoraMarcada,
+                COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa,
+                COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS nomeUnidade,
+                'Av. Julia Rodrigues Torres' AS strEndereco,
+                '855' AS strNumero,
+                'Floresta, Belo Jardim' AS strBairro,
+                'PE' AS strEstado,
                 dbo.fncBase64_Encode(CONVERT(VARCHAR, w.intagendaid) + '-' + CONVERT(VARCHAR, GETDATE(), 120)) AS Link
             from tblWhatsAppEnvio W
             inner join vwAgenda a on a.intAgendaId = w.intAgendaId
-            inner join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
-            inner join tblEmpresa E on E.intEmpresaId = TA.intUnidadeId  
+            left join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
+            left join tblEmpresa EUnidade on EUnidade.intEmpresaId = TA.intUnidadeId
+            left join tblEmpresa EVw on EVw.intEmpresaId = a.intEmpresaId  
             where IsNull(w.bolConfirma,'N') NOT IN ('S')
             and w.bolMensagemErro = 0
             and len(w.strTelefone) >= 10 
+            and (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
             
             -- Lógica complexa de envio:
             -- 1. Se for agendamento futuro: Só envia lembrete se JÁ tiver enviado boas-vindas (bolEnviado != 'N')
@@ -271,6 +296,7 @@ class MessageRepository {
         const result = await this.pool.request()
             .input('testModeEnabled', sql.Bit, config.testModeEnabled ? 1 : 0)
             .input('testNameFilter', sql.VarChar, `%${config.testPatientNameFilter || 'TESTE'}%`)
+            .input('companyName', sql.VarChar, this.getCompanyName(config))
             .input('messagingStartDate', sql.Date, config.messagingStartDate || null)
             .input('skipPastAppointmentTime', sql.Bit, config.skipPastAppointmentTime ? 1 : 0)
             .query(querySelect);
