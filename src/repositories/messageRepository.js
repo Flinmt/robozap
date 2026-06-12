@@ -6,8 +6,7 @@ class MessageRepository {
     }
 
     getCompanyName(config = {}) {
-        const companyName = String(config.companyName || config.clientName || '').trim();
-        return companyName || null;
+        return null;
     }
 
     async gerarFilaAgendamentos(config) {
