@@ -20,7 +20,7 @@ const dbConfig = {
 
 async function connect() {
     try {
-        const pool = await sql.connect(dbConfig);
+        const pool = await new sql.ConnectionPool(dbConfig).connect();
         return pool;
     } catch (err) {
         console.error('❌ Erro na conexão com o Banco de Dados:', err);

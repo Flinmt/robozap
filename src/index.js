@@ -41,6 +41,7 @@ const AUTH_TOKEN = process.env.AUTH_TOKEN;
 const SHOWTICKET_URL = process.env.SHOWTICKET_URL || (PARTNERBOT_URL ? PARTNERBOT_URL.replace(/\/template$/, '/showticket') : null);
 const COMPANY_NAME = process.env.COMPANY_NAME || null;
 const INTERVALO_CHECK = 10000;
+const SEND_BATCH_LIMIT = 20;
 
 function createRequestId() {
     return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -74,6 +75,8 @@ const botService = new PartnerBotService(PARTNERBOT_URL, AUTH_TOKEN, SHOWTICKET_
 let isProcessing = false;
 let ultimoLogForaHorario = 0;
 let ultimoLogPausado = 0;
+let ultimoLogTemplateAgendamentoAusente = 0;
+let ultimoLogTemplateConfirmacaoAusente = 0;
 const workerState = {
     lastCycleAt: null,
     lastCycleResult: 'Aguardando primeiro ciclo',
@@ -381,6 +384,15 @@ function montarDadosFormatados(msg) {
     };
 }
 
+function logPayloadFailure(context, msg, payload, error) {
+    const template = payload?.templateData?.template;
+    const body = (template?.components || []).find((component) => component.type === 'body');
+    const parameters = body?.parameters || [];
+
+    logger.error(`${context} ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
+    logger.error(`${context} payload resumo ID ${msg.intWhatsAppEnvioId}: template=${template?.name || '-'}, numero=${payload?.number || '-'}, isClosed=${payload?.isClosed}, parametros=${parameters.length}, valores=${JSON.stringify(parameters.map((parameter) => parameter.text))}`);
+}
+
 function estaForaDoHorario(agora, config) {
     const options = { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false };
     const horaStr = new Intl.DateTimeFormat('en-US', options).format(agora);
@@ -400,6 +412,19 @@ function envioAindaNaoLiberado(agora, config) {
     }).format(agora);
 
     return hojeBrasil < config.outboundSendStartDate;
+}
+
+function shouldLogTemplateWarning(agora, kind) {
+    const lastLog = kind === 'agendamento'
+        ? ultimoLogTemplateAgendamentoAusente
+        : ultimoLogTemplateConfirmacaoAusente;
+
+    if (agora.getTime() - lastLog <= 60 * 60 * 1000) return false;
+
+    if (kind === 'agendamento') ultimoLogTemplateAgendamentoAusente = agora.getTime();
+    else ultimoLogTemplateConfirmacaoAusente = agora.getTime();
+
+    return true;
 }
 
 // ==========================================
@@ -459,7 +484,7 @@ async function processarFila() {
         if (config.queueProducerEnabled) {
             totalFilaCriada = await repository.gerarFilaAgendamentos(config);
             workerState.lastQueueProducedCount = totalFilaCriada;
-            logger.info(`Produtor de fila criou ${totalFilaCriada} registro(s).`);
+            logger.info(`Produtor de fila: limite=${config.queueProducerLimit}, criado(s)=${totalFilaCriada}.`);
         } else {
             workerState.lastQueueProducedCount = 0;
         }
@@ -476,13 +501,19 @@ async function processarFila() {
         totalAgendamentos = mensagens.length;
 
         if (!config.templateNewSchedule) {
-            logger.warn('Template de agendamento nao configurado. Envio de novas mensagens bloqueado.');
+            if (shouldLogTemplateWarning(agora, 'agendamento')) {
+                logger.warn('Template de agendamento nao configurado. Envio de novas mensagens bloqueado.');
+            }
         }
 
         if (mensagens.length > 0) {
-            logger.info(`Encontradas ${mensagens.length} novas mensagens.`);
+            logger.info(`Envio de agendamentos: selecionado(s)=${mensagens.length}, limite_por_lote=${SEND_BATCH_LIMIT}, cadencia=${config.sendIntervalSeconds}s.`);
+            if (mensagens.length === SEND_BATCH_LIMIT) {
+                logger.info('Envio de agendamentos atingiu o limite do lote; se houver mais pendentes, serao processados nos proximos ciclos.');
+            }
 
             for (const msg of mensagens) {
+                let payload = null;
                 try {
                     const telefoneFinal = formatters.limparTelefone(msg.strtelefone, config);
 
@@ -499,14 +530,14 @@ async function processarFila() {
                         logger.info(`[TicketCheck] Agendamento ID ${msg.intWhatsAppEnvioId} numero=${telefoneFinal} ticketAberto=${ticket.encontrado}`);
                     }
 
-                    const payload = formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados, { ...config, partnerbotIsClosed: isClosed });
+                    payload = formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados, { ...config, partnerbotIsClosed: isClosed });
 
                     logger.info(`Enviando Agendamento ID ${msg.intWhatsAppEnvioId}...`);
                     await botService.enviarMensagem(payload);
                     await repository.marcarComoEnviado(msg.intWhatsAppEnvioId, config);
                     logger.info(`Sucesso Agendamento ID: ${msg.intWhatsAppEnvioId}`);
                 } catch (error) {
-                    logger.error(`Falha Agendamento ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
+                    logPayloadFailure('Falha Agendamento', msg, payload, error);
 
                     try {
                         await repository.marcarComoErro(msg.intWhatsAppEnvioId);
@@ -521,19 +552,30 @@ async function processarFila() {
             }
         }
 
-        const confirmacoes = config.templateReminder
+        const usarTemplateAgendamentoParaConfirmacao = !config.templateReminder && Boolean(config.templateNewSchedule);
+        const confirmacoes = (config.templateReminder || usarTemplateAgendamentoParaConfirmacao)
             ? await repository.buscarConfirmacoesPendentes(config)
             : [];
         totalConfirmacoes = confirmacoes.length;
 
         if (!config.templateReminder) {
-            logger.warn('Template de confirmacao nao configurado. Envio de lembretes bloqueado.');
+            if (usarTemplateAgendamentoParaConfirmacao) {
+                if (shouldLogTemplateWarning(agora, 'confirmacao')) {
+                    logger.info('Template de confirmacao nao configurado. Confirmacoes serao enviadas com o template de agendamento.');
+                }
+            } else if (shouldLogTemplateWarning(agora, 'confirmacao')) {
+                logger.warn('Template de confirmacao nao configurado. Envio de lembretes bloqueado.');
+            }
         }
 
         if (confirmacoes.length > 0) {
-            logger.info(`Encontrados ${confirmacoes.length} lembretes para enviar.`);
+            logger.info(`Envio de confirmacoes: selecionado(s)=${confirmacoes.length}, limite_por_lote=${SEND_BATCH_LIMIT}, cadencia=${config.sendIntervalSeconds}s${usarTemplateAgendamentoParaConfirmacao ? ', fallback=template_agendamento' : ''}.`);
+            if (confirmacoes.length === SEND_BATCH_LIMIT) {
+                logger.info('Envio de confirmacoes atingiu o limite do lote; se houver mais pendentes, serao processadas nos proximos ciclos.');
+            }
 
             for (const msg of confirmacoes) {
+                let payload = null;
                 try {
                     const telefoneFinal = formatters.limparTelefone(msg.strtelefone, config);
 
@@ -542,7 +584,6 @@ async function processarFila() {
                     }
 
                     const dadosFormatados = montarDadosFormatados(msg);
-                    const linkBotao = msg.Link || '-';
                     let isClosed = config.partnerbotIsClosed;
 
                     if (config.useTicketOpenForIsClosed) {
@@ -551,14 +592,17 @@ async function processarFila() {
                         logger.info(`[TicketCheck] Lembrete ID ${msg.intWhatsAppEnvioId} numero=${telefoneFinal} ticketAberto=${ticket.encontrado}`);
                     }
 
-                    const payload = formatters.montarPayloadConfirmacao(telefoneFinal, dadosFormatados, linkBotao, { ...config, partnerbotIsClosed: isClosed });
+                    const payloadConfig = { ...config, partnerbotIsClosed: isClosed };
+                    payload = usarTemplateAgendamentoParaConfirmacao
+                        ? formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados, payloadConfig)
+                        : formatters.montarPayloadConfirmacao(telefoneFinal, dadosFormatados, msg.Link || '-', payloadConfig);
 
-                    logger.info(`Enviando Lembrete ID ${msg.intWhatsAppEnvioId}...`);
+                    logger.info(`Enviando Lembrete ID ${msg.intWhatsAppEnvioId}${usarTemplateAgendamentoParaConfirmacao ? ' com template de agendamento' : ''}...`);
                     await botService.enviarMensagem(payload);
                     await repository.marcarConfirmacaoComoEnviada(msg.intWhatsAppEnvioId, config);
                     logger.info(`Lembrete enviado ID: ${msg.intWhatsAppEnvioId}`);
                 } catch (error) {
-                    logger.error(`Falha Lembrete ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
+                    logPayloadFailure('Falha Lembrete', msg, payload, error);
 
                     try {
                         await repository.marcarComoErro(msg.intWhatsAppEnvioId);
@@ -573,7 +617,11 @@ async function processarFila() {
             }
         }
 
-        workerState.lastCycleResult = `Ciclo concluido: ${totalFilaCriada} criados na fila, ${totalAgendamentos} agendamentos, ${totalConfirmacoes} lembretes`;
+        const bloqueios = [];
+        if (!config.templateNewSchedule) bloqueios.push('agendamentos bloqueados sem template');
+        if (!config.templateReminder && !usarTemplateAgendamentoParaConfirmacao) bloqueios.push('confirmacoes bloqueadas sem template');
+        if (usarTemplateAgendamentoParaConfirmacao) bloqueios.push('confirmacoes via template de agendamento');
+        workerState.lastCycleResult = `Ciclo concluido: ${totalFilaCriada} criados na fila, ${totalAgendamentos} agendamentos, ${totalConfirmacoes} lembretes${bloqueios.length ? `. ${bloqueios.join('; ')}` : ''}`;
     } catch (err) {
         logger.error(`Erro Geral no Worker: ${err.message}`);
         workerState.lastCycleResult = `Erro geral: ${err.message}`;

@@ -859,6 +859,11 @@ function renderAdminPage(basePath) {
 
     refresh().catch((err) => setMessage(err.message, false));
 
+    setInterval(() => {
+      if (isDirty()) return;
+      refresh().catch((err) => setMessage(err.message, false));
+    }, 10000);
+
     fields.forEach((field) => {
       const input = document.getElementById(field);
       input.addEventListener('input', updateSaveState);

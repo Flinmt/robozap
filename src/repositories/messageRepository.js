@@ -69,7 +69,7 @@ class MessageRepository {
               AND NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
               AND LEN(phone.finalPhone) >= 10
               AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
-              AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, DATEADD(DAY, @lookaheadDays, GETDATE()))
+              AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, DATEADD(DAY, 2, GETDATE())) AND CONVERT(DATE, DATEADD(DAY, @lookaheadDays, GETDATE()))
               AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, E.strEmpresa)))) = UPPER(@companyName))
               AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
               AND (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
@@ -98,7 +98,28 @@ class MessageRepository {
 
     async listarFilaPendente(config) {
         const querySelect = `
-            WITH fila AS (
+            WITH confirmacaoElegivel AS (
+                SELECT intWhatsAppEnvioId
+                FROM (
+                    SELECT
+                        w.intWhatsAppEnvioId,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY w.intAgendaId
+                            ORDER BY w.intWhatsAppEnvioId DESC
+                        ) AS rn
+                    FROM tblWhatsAppEnvio w
+                    WHERE IsNull(w.bolConfirma,'N') NOT IN ('S')
+                      AND w.bolMensagemErro = 0
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM tblWhatsAppEnvio wOk
+                        WHERE wOk.intAgendaId = w.intAgendaId
+                          AND IsNull(wOk.bolConfirma,'N') = 'S'
+                      )
+                ) ranked
+                WHERE rn = 1
+            ),
+            fila AS (
                 SELECT
                     w.intWhatsAppEnvioId,
                     w.intAgendaId,
@@ -119,13 +140,64 @@ class MessageRepository {
                     CASE
                         WHEN IsNull(w.bolEnviado,'N') NOT IN ('S')
                          AND w.bolMensagemErro = 0
+                         AND @templateNewScheduleConfigured = 0
                          AND w.strTipo IN ('AgendaInicio', 'agendainicio')
                          AND len(w.strTelefone) >= 10
-                         AND CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE())
+                         AND CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE() + 1)
+                         AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
+                        THEN 'agendamento_sem_template'
+                        WHEN IsNull(w.bolEnviado,'N') NOT IN ('S')
+                         AND w.bolMensagemErro = 0
+                         AND @templateNewScheduleConfigured = 1
+                         AND w.strTipo IN ('AgendaInicio', 'agendainicio')
+                         AND len(w.strTelefone) >= 10
+                         AND CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE() + 1)
                          AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
                         THEN 'agendamento'
                         WHEN IsNull(w.bolConfirma,'N') NOT IN ('S')
                          AND w.bolMensagemErro = 0
+                         AND ce.intWhatsAppEnvioId IS NOT NULL
+                         AND @templateReminderConfigured = 0
+                         AND @templateNewScheduleConfigured = 1
+                         AND len(w.strTelefone) >= 10
+                         AND (
+                            (IsNull(w.bolEnviado,'S') NOT IN ('N'))
+                            OR (CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE()))
+                         )
+                         AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
+                         AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
+                         AND (
+                            @skipPastAppointmentTime = 0
+                            OR ISNULL(
+                                TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                                a.datAgendamento
+                            ) >= GETDATE()
+                         )
+                        THEN 'confirmacao_fallback_agendamento'
+                        WHEN IsNull(w.bolConfirma,'N') NOT IN ('S')
+                         AND w.bolMensagemErro = 0
+                         AND ce.intWhatsAppEnvioId IS NOT NULL
+                         AND @templateReminderConfigured = 0
+                         AND @templateNewScheduleConfigured = 0
+                         AND len(w.strTelefone) >= 10
+                         AND (
+                            (IsNull(w.bolEnviado,'S') NOT IN ('N'))
+                            OR (CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE()))
+                         )
+                         AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
+                         AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
+                         AND (
+                            @skipPastAppointmentTime = 0
+                            OR ISNULL(
+                                TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                                a.datAgendamento
+                            ) >= GETDATE()
+                         )
+                        THEN 'confirmacao_sem_template'
+                        WHEN IsNull(w.bolConfirma,'N') NOT IN ('S')
+                         AND w.bolMensagemErro = 0
+                         AND ce.intWhatsAppEnvioId IS NOT NULL
+                         AND @templateReminderConfigured = 1
                          AND len(w.strTelefone) >= 10
                          AND (
                             (IsNull(w.bolEnviado,'S') NOT IN ('N'))
@@ -145,6 +217,7 @@ class MessageRepository {
                     END AS tipoFila
                 FROM tblWhatsAppEnvio W
                 INNER JOIN vwAgenda a ON a.intAgendaId = w.intAgendaId
+                LEFT JOIN confirmacaoElegivel ce ON ce.intWhatsAppEnvioId = w.intWhatsAppEnvioId
                 LEFT JOIN tblAgenda TA ON TA.intAgendaId = w.intAgendaId
                 LEFT JOIN tblEmpresa EUnidade ON EUnidade.intEmpresaId = TA.intUnidadeId
                 LEFT JOIN tblEmpresa EVw ON EVw.intEmpresaId = a.intEmpresaId
@@ -175,7 +248,7 @@ class MessageRepository {
                 strunidade,
                 tipoFila
             FROM fila
-            WHERE tipoFila IN ('agendamento', 'confirmacao')
+            WHERE tipoFila IN ('agendamento', 'agendamento_sem_template', 'confirmacao', 'confirmacao_fallback_agendamento', 'confirmacao_sem_template')
             ORDER BY datAgendamento, strHora, intWhatsAppEnvioId
         `;
 
@@ -183,6 +256,8 @@ class MessageRepository {
             .input('testModeEnabled', sql.Bit, config.testModeEnabled ? 1 : 0)
             .input('testNameFilter', sql.VarChar, `%${config.testPatientNameFilter}%`)
             .input('companyName', sql.VarChar, this.getCompanyName(config))
+            .input('templateNewScheduleConfigured', sql.Bit, config.templateNewSchedule ? 1 : 0)
+            .input('templateReminderConfigured', sql.Bit, config.templateReminder ? 1 : 0)
             .input('messagingStartDate', sql.Date, config.messagingStartDate || null)
             .input('skipPastAppointmentTime', sql.Bit, config.skipPastAppointmentTime ? 1 : 0)
             .query(querySelect);
@@ -221,7 +296,7 @@ class MessageRepository {
             and w.bolMensagemErro = 0
             and w.strTipo IN ('AgendaInicio', 'agendainicio')
             and len(w.strTelefone) >= 10 
-            and CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE())
+            and CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE() + 1)
             and (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
             and (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
             and (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter OR W.strAgenda LIKE @testNameFilter)
@@ -244,6 +319,23 @@ class MessageRepository {
     // Regra principal: Enviar para agendamentos de HOJE ou AMANHÃ.
     async buscarConfirmacoesPendentes(config = {}) {
         const querySelect = `
+            WITH pendentes AS (
+                SELECT
+                    w.intWhatsAppEnvioId,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY w.intAgendaId
+                        ORDER BY w.intWhatsAppEnvioId DESC
+                    ) AS rn
+                FROM tblWhatsAppEnvio w
+                WHERE IsNull(w.bolConfirma,'N') NOT IN ('S')
+                  AND w.bolMensagemErro = 0
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM tblWhatsAppEnvio wOk
+                    WHERE wOk.intAgendaId = w.intAgendaId
+                      AND IsNull(wOk.bolConfirma,'N') = 'S'
+                  )
+            )
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
                 CASE WHEN a.strAgenda='' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
@@ -262,6 +354,7 @@ class MessageRepository {
                 'PE' AS strEstado,
                 dbo.fncBase64_Encode(CONVERT(VARCHAR, w.intagendaid) + '-' + CONVERT(VARCHAR, GETDATE(), 120)) AS Link
             from tblWhatsAppEnvio W
+            inner join pendentes p on p.intWhatsAppEnvioId = w.intWhatsAppEnvioId and p.rn = 1
             inner join vwAgenda a on a.intAgendaId = w.intAgendaId
             left join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
             left join tblEmpresa EUnidade on EUnidade.intEmpresaId = TA.intUnidadeId
