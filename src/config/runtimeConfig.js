@@ -35,6 +35,8 @@ function parseDateString(value, fallback = '') {
 
 function getDefaults() {
     return {
+        partnerbotUrl: process.env.URL || '',
+        showticketUrl: process.env.SHOWTICKET_URL || '',
         clientName: '',
         clientCode: '',
         paused: parseBoolean(process.env.WORKER_PAUSED, true),
@@ -82,6 +84,8 @@ function normalizeConfig(input) {
     const merged = { ...defaults, ...input };
 
     return {
+        partnerbotUrl: String(merged.partnerbotUrl || ''),
+        showticketUrl: String(merged.showticketUrl || ''),
         clientName: String(merged.clientName || ''),
         clientCode: String(merged.clientCode || ''),
         paused: parseBoolean(merged.paused, defaults.paused),

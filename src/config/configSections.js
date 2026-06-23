@@ -9,6 +9,8 @@ function toSections(flat) {
             reminder: String(flat.templateReminder || '')
         },
         integration: {
+            partnerbotUrl: String(flat.partnerbotUrl || ''),
+            showticketUrl: String(flat.showticketUrl || ''),
             partnerbotAuthToken: String(flat.partnerbotAuthToken || ''),
             useTicketOpenForIsClosed: Boolean(flat.useTicketOpenForIsClosed),
             normalizeBrazilMobileNinthDigit: Boolean(flat.normalizeBrazilMobileNinthDigit)
@@ -68,6 +70,12 @@ function validateSection(section, payload) {
     }
 
     if (section === 'integration') {
+        if (typeof payload.partnerbotUrl !== 'string') {
+            pushError('partnerbotUrl', 'VALIDATION_PARTNERBOT_URL', 'URL da PartnerBot deve ser texto.');
+        }
+        if (typeof payload.showticketUrl !== 'string') {
+            pushError('showticketUrl', 'VALIDATION_SHOWTICKET_URL', 'URL do ShowTicket deve ser texto.');
+        }
         if (typeof payload.partnerbotAuthToken !== 'string') {
             pushError('partnerbotAuthToken', 'VALIDATION_PARTNERBOT_AUTH_TOKEN', 'Token da PartnerBot invalido.');
         }
@@ -120,6 +128,8 @@ function toFlatPatch(section, payload) {
     if (section === 'client') return { clientName: payload.name, clientCode: payload.code };
     if (section === 'templates') return { templateNewSchedule: payload.newSchedule, templateReminder: payload.reminder };
     if (section === 'integration') return {
+        partnerbotUrl: payload.partnerbotUrl,
+        showticketUrl: payload.showticketUrl,
         partnerbotAuthToken: payload.partnerbotAuthToken,
         useTicketOpenForIsClosed: payload.useTicketOpenForIsClosed,
         normalizeBrazilMobileNinthDigit: payload.normalizeBrazilMobileNinthDigit

@@ -410,6 +410,16 @@ function renderAdminPage(basePath) {
                 <input id="templateReminder" name="templateReminder" type="text">
               </div>
               <div>
+                <label for="partnerbotUrl">URL da API PartnerBot (opcional)</label>
+                <input id="partnerbotUrl" name="partnerbotUrl" type="text" placeholder="https://.../template">
+                <small class="helper">Sobrescreve a URL do .env para esta instancia.</small>
+              </div>
+              <div>
+                <label for="showticketUrl">URL do ShowTicket (opcional)</label>
+                <input id="showticketUrl" name="showticketUrl" type="text" placeholder="https://.../showticket">
+                <small class="helper">Sobrescreve o .env. Se vazio, deriva da URL da API.</small>
+              </div>
+              <div>
                 <label for="partnerbotAuthToken">Token PartnerBot (opcional)</label>
                 <input id="partnerbotAuthToken" name="partnerbotAuthToken" type="text" autocomplete="off" placeholder="Bearer ...">
                 <small class="helper">Se preenchido, sobrescreve o token do .env para esta instancia.</small>
@@ -618,6 +628,8 @@ function renderAdminPage(basePath) {
       'clientCode',
       'templateNewSchedule',
       'templateReminder',
+      'partnerbotUrl',
+      'showticketUrl',
       'partnerbotAuthToken',
       'useTicketOpenForIsClosed',
       'normalizeBrazilMobileNinthDigit',

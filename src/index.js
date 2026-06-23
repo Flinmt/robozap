@@ -438,6 +438,9 @@ async function processarFila() {
     try {
         config = runtimeConfig.getConfig();
         botService.authToken = config.partnerbotAuthToken || AUTH_TOKEN;
+        botService.apiUrl = config.partnerbotUrl || PARTNERBOT_URL;
+        botService.showTicketUrl = config.showticketUrl
+            || (config.partnerbotUrl ? config.partnerbotUrl.replace(/\/template$/, '/showticket') : SHOWTICKET_URL);
     } catch (error) {
         workerState.lastCycleResult = `Erro de configuracao: ${error.message}`;
         logger.error(`Erro de configuracao runtime: ${error.message}`);
