@@ -11,6 +11,7 @@ const dbConfig = {
     password: process.env.DB_PASSWORD,
     server: process.env.DB_SERVER,
     database: process.env.DB_NAME,
+    requestTimeout: parseInt(process.env.DB_REQUEST_TIMEOUT, 10) || 60000,
     options: {
         encrypt: false,
         trustServerCertificate: true,
