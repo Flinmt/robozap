@@ -9,7 +9,7 @@ class MessageRepository {
         return null;
     }
 
-    async validarAgendamentoAntesDoEnvio(intAgendaId, config = {}) {
+    async validarAgendamentoAntesDoEnvio(intAgendaId, config = {}, queueMessage = {}) {
         const querySelect = `
             SELECT TOP 1
                 a.intAgendaId,
@@ -18,12 +18,10 @@ class MessageRepository {
                 a.datAgendamento,
                 a.strHora,
                 CONVERT(varchar(10), a.datAgendamento, 120) AS dataAgendamentoIso,
+                CONVERT(varchar(19), appointment.appointmentAt, 120) AS appointmentAtIso,
                 CASE
                     WHEN @skipPastAppointmentTime = 1
-                     AND ISNULL(
-                        TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
-                        a.datAgendamento
-                     ) < GETDATE()
+                     AND appointment.appointmentAt < GETDATE()
                     THEN 1
                     ELSE 0
                 END AS horarioPassado,
@@ -32,6 +30,12 @@ class MessageRepository {
             LEFT JOIN tblAgenda TA ON TA.intAgendaId = a.intAgendaId
             LEFT JOIN tblEmpresa EUnidade ON EUnidade.intEmpresaId = TA.intUnidadeId
             LEFT JOIN tblEmpresa EVw ON EVw.intEmpresaId = a.intEmpresaId
+            CROSS APPLY (
+                SELECT appointmentAt = ISNULL(
+                    TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                    a.datAgendamento
+                )
+            ) appointment
             WHERE a.intAgendaId = @intAgendaId
         `;
 
@@ -45,6 +49,17 @@ class MessageRepository {
 
         const nomePaciente = String(agenda.strAgenda || '').trim();
         if (!nomePaciente) return { valido: false, motivo: 'slot_sem_paciente' };
+
+        if (queueMessage.datDataAlerta) {
+            const dataFila = queueMessage.datDataAlerta instanceof Date
+                ? queueMessage.datDataAlerta.toISOString().slice(0, 19).replace('T', ' ')
+                : String(queueMessage.datDataAlerta || '').slice(0, 19).replace('T', ' ');
+            if (dataFila && dataFila !== agenda.appointmentAtIso) {
+                return { valido: false, motivo: 'compromisso_divergente' };
+            }
+        } else {
+            return { valido: false, motivo: 'fila_sem_data_agendamento' };
+        }
 
         const bloqueado = String(agenda.bolBloqueado ?? 'N').trim().toUpperCase();
         if (bloqueado === 'S' || bloqueado === '1') return { valido: false, motivo: 'slot_bloqueado' };
@@ -84,6 +99,7 @@ class MessageRepository {
                 strTelefone,
                 intEmpresaId,
                 datWhatsAppEnvio,
+                datDataAlerta,
                 intAgendaId,
                 strAgenda,
                 intClienteId,
@@ -100,6 +116,7 @@ class MessageRepository {
                 phone.finalPhone,
                 a.intEmpresaId,
                 GETDATE(),
+                appointment.appointmentAt,
                 a.intAgendaId,
                 a.strAgenda,
                 a.intClienteId,
@@ -127,11 +144,17 @@ class MessageRepository {
                     ELSE sourcePhone.rawPhone
                 END
             ) phone
+            CROSS APPLY (
+                SELECT appointmentAt = ISNULL(
+                    TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                    a.datAgendamento
+                )
+            ) appointment
             WHERE a.intAgendaId IS NOT NULL
               AND NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
               AND LEN(phone.finalPhone) >= 10
               AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
-              AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, DATEADD(DAY, 2, GETDATE())) AND CONVERT(DATE, DATEADD(DAY, @lookaheadDays, GETDATE()))
+              AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, DATEADD(DAY, @lookaheadDays, GETDATE()))
               AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, E.strEmpresa)))) = UPPER(@companyName))
               AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
               AND (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
@@ -139,7 +162,20 @@ class MessageRepository {
                   SELECT 1
                   FROM tblWhatsAppEnvio w
                   WHERE w.intAgendaId = a.intAgendaId
+                    AND w.datDataAlerta = appointment.appointmentAt
                     AND w.strTipo IN ('AgendaInicio', 'agendainicio')
+                    AND (
+                        (
+                            ISNULL(a.intClienteId, 0) > 0
+                            AND w.intClienteId = a.intClienteId
+                        )
+                        OR (
+                            ISNULL(a.intClienteId, 0) <= 0
+                            AND ISNULL(w.intClienteId, 0) <= 0
+                            AND UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, '')))) = UPPER(LTRIM(RTRIM(a.strAgenda)))
+                            AND ISNULL(w.strTelefone, '') = phone.finalPhone
+                        )
+                    )
               )
             ORDER BY a.datAgendamento, a.strHora, a.intAgendaId;
 
@@ -160,29 +196,8 @@ class MessageRepository {
 
     async listarFilaPendente(config) {
         const querySelect = `
-            WITH confirmacaoElegivel AS (
-                SELECT intWhatsAppEnvioId
-                FROM (
-                    SELECT
-                        w.intWhatsAppEnvioId,
-                        ROW_NUMBER() OVER (
-                            PARTITION BY w.intAgendaId
-                            ORDER BY w.intWhatsAppEnvioId DESC
-                        ) AS rn
-                    FROM tblWhatsAppEnvio w
-                    WHERE IsNull(w.bolConfirma,'N') NOT IN ('S')
-                      AND w.bolMensagemErro = 0
-                      AND NOT EXISTS (
-                        SELECT 1
-                        FROM tblWhatsAppEnvio wOk
-                        WHERE wOk.intAgendaId = w.intAgendaId
-                          AND IsNull(wOk.bolConfirma,'N') = 'S'
-                      )
-                ) ranked
-                WHERE rn = 1
-            ),
-            fila AS (
-                SELECT
+            WITH candidatos AS (
+                SELECT TOP 100
                     w.intWhatsAppEnvioId,
                     w.intAgendaId,
                     w.strTipo,
@@ -199,100 +214,127 @@ class MessageRepository {
                     a.bolAtendeHoraMarcada,
                     COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa,
                     COALESCE(a.strUnidade, '') AS strunidade,
+                    CONVERT(varchar(19), w.datDataAlerta, 120) AS datDataAlerta,
                     CASE
-                        WHEN IsNull(w.bolEnviado,'N') NOT IN ('S')
-                         AND w.bolMensagemErro = 0
-                         AND @templateNewScheduleConfigured = 0
-                         AND w.strTipo IN ('AgendaInicio', 'agendainicio')
-                         AND len(w.strTelefone) >= 10
-                         AND CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE() + 1)
-                         AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-                        THEN 'agendamento_sem_template'
-                        WHEN IsNull(w.bolEnviado,'N') NOT IN ('S')
-                         AND w.bolMensagemErro = 0
-                         AND @templateNewScheduleConfigured = 1
-                         AND w.strTipo IN ('AgendaInicio', 'agendainicio')
-                         AND len(w.strTelefone) >= 10
-                         AND CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE() + 1)
-                         AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-                        THEN 'agendamento'
-                        WHEN IsNull(w.bolConfirma,'N') NOT IN ('S')
-                         AND w.bolMensagemErro = 0
-                         AND ce.intWhatsAppEnvioId IS NOT NULL
-                         AND @templateReminderConfigured = 0
-                         AND @templateNewScheduleConfigured = 1
-                         AND len(w.strTelefone) >= 10
-                         AND (
-                            (IsNull(w.bolEnviado,'S') NOT IN ('N'))
-                            OR (CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE()))
-                         )
-                         AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
-                         AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-                         AND (
-                            @skipPastAppointmentTime = 0
-                            OR ISNULL(
-                                TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
-                                a.datAgendamento
-                            ) >= GETDATE()
-                         )
-                        THEN 'confirmacao_fallback_agendamento'
-                        WHEN IsNull(w.bolConfirma,'N') NOT IN ('S')
-                         AND w.bolMensagemErro = 0
-                         AND ce.intWhatsAppEnvioId IS NOT NULL
-                         AND @templateReminderConfigured = 0
-                         AND @templateNewScheduleConfigured = 0
-                         AND len(w.strTelefone) >= 10
-                         AND (
-                            (IsNull(w.bolEnviado,'S') NOT IN ('N'))
-                            OR (CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE()))
-                         )
-                         AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
-                         AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-                         AND (
-                            @skipPastAppointmentTime = 0
-                            OR ISNULL(
-                                TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
-                                a.datAgendamento
-                            ) >= GETDATE()
-                         )
-                        THEN 'confirmacao_sem_template'
-                        WHEN IsNull(w.bolConfirma,'N') NOT IN ('S')
-                         AND w.bolMensagemErro = 0
-                         AND ce.intWhatsAppEnvioId IS NOT NULL
-                         AND @templateReminderConfigured = 1
-                         AND len(w.strTelefone) >= 10
-                         AND (
-                            (IsNull(w.bolEnviado,'S') NOT IN ('N'))
-                            OR (CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE()))
-                         )
-                         AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
-                         AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-                         AND (
-                            @skipPastAppointmentTime = 0
-                            OR ISNULL(
-                                TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
-                                a.datAgendamento
-                            ) >= GETDATE()
-                         )
-                        THEN 'confirmacao'
-                        ELSE 'fora_dos_filtros'
+                        WHEN @templateNewScheduleConfigured = 1 THEN 'agendamento'
+                        ELSE 'agendamento_sem_template'
                     END AS tipoFila
                 FROM tblWhatsAppEnvio W
                 INNER JOIN vwAgenda a ON a.intAgendaId = w.intAgendaId
-                LEFT JOIN confirmacaoElegivel ce ON ce.intWhatsAppEnvioId = w.intWhatsAppEnvioId
                 LEFT JOIN tblAgenda TA ON TA.intAgendaId = w.intAgendaId
                 LEFT JOIN tblEmpresa EUnidade ON EUnidade.intEmpresaId = TA.intUnidadeId
                 LEFT JOIN tblEmpresa EVw ON EVw.intEmpresaId = a.intEmpresaId
-                WHERE w.bolMensagemErro = 0
-                  AND (
-                    IsNull(w.bolEnviado,'N') NOT IN ('S')
-                    OR IsNull(w.bolConfirma,'N') NOT IN ('S')
-                  )
+                CROSS APPLY (
+                    SELECT appointmentAt = ISNULL(
+                        TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                        a.datAgendamento
+                    )
+                ) appointment
+                WHERE IsNull(w.bolEnviado,'N') NOT IN ('S')
+                  AND w.bolMensagemErro = 0
+                  AND w.strTipo IN ('AgendaInicio', 'agendainicio')
+                  AND len(w.strTelefone) >= 10
+                  AND w.datDataAlerta = appointment.appointmentAt
                   AND NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
                   AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
+                  AND CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE() + 1)
                   AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
                   AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
                   AND (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
+
+                UNION ALL
+
+                SELECT TOP 100
+                    w.intWhatsAppEnvioId,
+                    w.intAgendaId,
+                    w.strTipo,
+                    a.strAgenda,
+                    w.strTelefone,
+                    IsNull(w.bolEnviado,'N') AS bolEnviado,
+                    IsNull(w.bolConfirma,'N') AS bolConfirma,
+                    w.bolMensagemErro,
+                    convert(varchar, a.datAgendamento, 103) as datagenda,
+                    a.datAgendamento,
+                    a.strHora,
+                    a.strProfissional,
+                    a.strEspecialidadeMedica,
+                    a.bolAtendeHoraMarcada,
+                    COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa,
+                    COALESCE(a.strUnidade, '') AS strunidade,
+                    CONVERT(varchar(19), w.datDataAlerta, 120) AS datDataAlerta,
+                    CASE
+                        WHEN @templateReminderConfigured = 1 THEN 'confirmacao'
+                        WHEN @templateNewScheduleConfigured = 1 THEN 'confirmacao_fallback_agendamento'
+                        ELSE 'confirmacao_sem_template'
+                    END AS tipoFila
+                FROM tblWhatsAppEnvio W
+                INNER JOIN vwAgenda a ON a.intAgendaId = w.intAgendaId
+                LEFT JOIN tblAgenda TA ON TA.intAgendaId = w.intAgendaId
+                LEFT JOIN tblEmpresa EUnidade ON EUnidade.intEmpresaId = TA.intUnidadeId
+                LEFT JOIN tblEmpresa EVw ON EVw.intEmpresaId = a.intEmpresaId
+                CROSS APPLY (
+                    SELECT appointmentAt = ISNULL(
+                        TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                        a.datAgendamento
+                    )
+                ) appointment
+                WHERE IsNull(w.bolConfirma,'N') NOT IN ('S')
+                  AND w.bolMensagemErro = 0
+                  AND len(w.strTelefone) >= 10
+                  AND w.datDataAlerta = appointment.appointmentAt
+                  AND NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
+                  AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
+                  AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
+                  AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
+                  AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
+                  AND (
+                    @skipPastAppointmentTime = 0
+                    OR ISNULL(
+                        TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                        a.datAgendamento
+                    ) >= GETDATE()
+                  )
+                  AND (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM tblWhatsAppEnvio wOk
+                    WHERE wOk.intAgendaId = w.intAgendaId
+                      AND wOk.datDataAlerta = w.datDataAlerta
+                      AND IsNull(wOk.bolConfirma,'N') = 'S'
+                      AND (
+                        (
+                            ISNULL(w.intClienteId, 0) > 0
+                            AND wOk.intClienteId = w.intClienteId
+                        )
+                        OR (
+                            ISNULL(w.intClienteId, 0) <= 0
+                            AND ISNULL(wOk.intClienteId, 0) <= 0
+                            AND UPPER(LTRIM(RTRIM(ISNULL(wOk.strAgenda, '')))) = UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, ''))))
+                            AND ISNULL(wOk.strTelefone, '') = ISNULL(w.strTelefone, '')
+                        )
+                      )
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM tblWhatsAppEnvio wNewer
+                    WHERE wNewer.intAgendaId = w.intAgendaId
+                      AND wNewer.datDataAlerta = w.datDataAlerta
+                      AND wNewer.intWhatsAppEnvioId > w.intWhatsAppEnvioId
+                      AND IsNull(wNewer.bolConfirma,'N') NOT IN ('S')
+                      AND wNewer.bolMensagemErro = 0
+                      AND (
+                        (
+                            ISNULL(w.intClienteId, 0) > 0
+                            AND wNewer.intClienteId = w.intClienteId
+                        )
+                        OR (
+                            ISNULL(w.intClienteId, 0) <= 0
+                            AND ISNULL(wNewer.intClienteId, 0) <= 0
+                            AND UPPER(LTRIM(RTRIM(ISNULL(wNewer.strAgenda, '')))) = UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, ''))))
+                            AND ISNULL(wNewer.strTelefone, '') = ISNULL(w.strTelefone, '')
+                        )
+                      )
+                  )
             )
             SELECT TOP 100
                 intWhatsAppEnvioId,
@@ -310,9 +352,9 @@ class MessageRepository {
                 bolAtendeHoraMarcada,
                 strEmpresa,
                 strunidade,
+                datDataAlerta,
                 tipoFila
-            FROM fila
-            WHERE tipoFila IN ('agendamento', 'agendamento_sem_template', 'confirmacao', 'confirmacao_fallback_agendamento', 'confirmacao_sem_template')
+            FROM candidatos
             ORDER BY datAgendamento, strHora, intWhatsAppEnvioId
         `;
 
@@ -342,6 +384,7 @@ class MessageRepository {
                 a.strAgenda,
                 w.intWhatsAppEnvioId, 
                 w.intAgendaId,
+                CONVERT(varchar(19), w.datDataAlerta, 120) AS datDataAlerta,
                 convert(varchar, a.datAgendamento, 103) as datagenda, 
                 a.strHora, 
                 a.strProfissional,
@@ -356,10 +399,17 @@ class MessageRepository {
             left join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
             left join tblEmpresa EUnidade on EUnidade.intEmpresaId = TA.intUnidadeId
             left join tblEmpresa EVw on EVw.intEmpresaId = a.intEmpresaId  
+            cross apply (
+                select appointmentAt = ISNULL(
+                    TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                    a.datAgendamento
+                )
+            ) appointment
             where IsNull(w.bolEnviado,'N') NOT IN ('S') 
             and w.bolMensagemErro = 0
             and w.strTipo IN ('AgendaInicio', 'agendainicio')
             and len(w.strTelefone) >= 10 
+            and w.datDataAlerta = appointment.appointmentAt
             and NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
             and ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
             and CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE() + 1)
@@ -389,17 +439,37 @@ class MessageRepository {
                 SELECT
                     w.intWhatsAppEnvioId,
                     ROW_NUMBER() OVER (
-                        PARTITION BY w.intAgendaId
+                        PARTITION BY
+                            w.intAgendaId,
+                            w.datDataAlerta,
+                            CASE
+                                WHEN ISNULL(w.intClienteId, 0) > 0 THEN CONVERT(varchar(20), w.intClienteId)
+                                ELSE UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, '')))) + '|' + ISNULL(w.strTelefone, '')
+                            END
                         ORDER BY w.intWhatsAppEnvioId DESC
                     ) AS rn
                 FROM tblWhatsAppEnvio w
                 WHERE IsNull(w.bolConfirma,'N') NOT IN ('S')
                   AND w.bolMensagemErro = 0
+                  AND w.datDataAlerta IS NOT NULL
                   AND NOT EXISTS (
                     SELECT 1
                     FROM tblWhatsAppEnvio wOk
                     WHERE wOk.intAgendaId = w.intAgendaId
+                      AND wOk.datDataAlerta = w.datDataAlerta
                       AND IsNull(wOk.bolConfirma,'N') = 'S'
+                      AND (
+                        (
+                            ISNULL(w.intClienteId, 0) > 0
+                            AND wOk.intClienteId = w.intClienteId
+                        )
+                        OR (
+                            ISNULL(w.intClienteId, 0) <= 0
+                            AND ISNULL(wOk.intClienteId, 0) <= 0
+                            AND UPPER(LTRIM(RTRIM(ISNULL(wOk.strAgenda, '')))) = UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, ''))))
+                            AND ISNULL(wOk.strTelefone, '') = ISNULL(w.strTelefone, '')
+                        )
+                      )
                   )
             )
             SELECT top 20
@@ -407,6 +477,7 @@ class MessageRepository {
                 a.strAgenda,
                 w.intWhatsAppEnvioId, 
                 w.intAgendaId,
+                CONVERT(varchar(19), w.datDataAlerta, 120) AS datDataAlerta,
                 convert(varchar, a.datAgendamento, 103) as datagenda, 
                 a.strHora, 
                 a.strProfissional,
@@ -425,21 +496,20 @@ class MessageRepository {
             left join tblAgenda TA on TA.intAgendaId = w.intAgendaId    
             left join tblEmpresa EUnidade on EUnidade.intEmpresaId = TA.intUnidadeId
             left join tblEmpresa EVw on EVw.intEmpresaId = a.intEmpresaId  
+            cross apply (
+                select appointmentAt = ISNULL(
+                    TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                    a.datAgendamento
+                )
+            ) appointment
             where IsNull(w.bolConfirma,'N') NOT IN ('S')
             and w.bolMensagemErro = 0
             and len(w.strTelefone) >= 10 
+            and w.datDataAlerta = appointment.appointmentAt
             and NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
             and ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
             and (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
             
-            -- Lógica complexa de envio:
-            -- 1. Se for agendamento futuro: Só envia lembrete se JÁ tiver enviado boas-vindas (bolEnviado != 'N')
-            -- 2. Se for agendamento HOJE: Envia lembrete DIRETO (ignora checagem de boas-vindas), pois servirá como confirmação dupla.
-            and (
-                (IsNull(w.bolEnviado,'S') NOT IN ('N')) -- Regra padrão
-                OR 
-                (CONVERT(DATE, a.datAgendamento) = CONVERT(DATE, GETDATE())) -- Exceção para o dia
-            ) 
             -- Regra: Enviar para agendamentos de hoje e amanhã
             and CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
             and (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))

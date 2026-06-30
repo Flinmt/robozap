@@ -30,6 +30,19 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function withTimeout(promise, ms, message) {
+    let timer;
+    const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => {
+            const error = new Error(message);
+            error.code = 'QUEUE_TIMEOUT';
+            reject(error);
+        }, ms);
+    });
+
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 // ==========================================
 // 1. CONFIGURACAO
 // ==========================================
@@ -80,8 +93,47 @@ let ultimoLogTemplateConfirmacaoAusente = 0;
 const workerState = {
     lastCycleAt: null,
     lastCycleResult: 'Aguardando primeiro ciclo',
-    lastQueueProducedCount: 0
+    lastQueueProducedCount: 0,
+    currentMessage: null,
+    currentStep: 'idle',
+    recentEvents: []
 };
+
+function buildMessageState(msg, tipo) {
+    if (!msg) return null;
+
+    return {
+        intWhatsAppEnvioId: msg.intWhatsAppEnvioId,
+        intAgendaId: msg.intAgendaId,
+        tipo,
+        strAgenda: msg.strAgenda || '',
+        strTelefone: msg.strtelefone || msg.strTelefone || '',
+        datagenda: msg.datagenda || '',
+        strHora: msg.strHora || '',
+        strProfissional: msg.strProfissional || '',
+        strEspecialidadeMedica: msg.strEspecialidadeMedica || ''
+    };
+}
+
+function setCurrentMessage(msg, tipo, step) {
+    workerState.currentMessage = buildMessageState(msg, tipo);
+    workerState.currentStep = step;
+}
+
+function clearCurrentMessage() {
+    workerState.currentMessage = null;
+    workerState.currentStep = 'idle';
+}
+
+function addRecentEvent(status, msg, tipo, detail = '') {
+    workerState.recentEvents.unshift({
+        at: new Date().toISOString(),
+        status,
+        detail,
+        message: buildMessageState(msg, tipo)
+    });
+    workerState.recentEvents = workerState.recentEvents.slice(0, 10);
+}
 
 // ==========================================
 // 2. SERVIDOR WEB
@@ -111,6 +163,9 @@ app.get(withBasePath(BASE_PATH, '/api/admin/status'), requireAdmin(BASE_PATH), (
         lastCycleAt: workerState.lastCycleAt,
         lastCycleResult: workerState.lastCycleResult,
         lastQueueProducedCount: workerState.lastQueueProducedCount,
+        currentMessage: workerState.currentMessage,
+        currentStep: workerState.currentStep,
+        recentEvents: workerState.recentEvents,
         configPath: runtimeConfig.configPath,
         config: runtimeConfig.getConfig()
     });
@@ -262,10 +317,15 @@ app.get(withBasePath(BASE_PATH, '/api/admin/queue'), requireAdmin(BASE_PATH), as
         const config = runtimeConfig.getConfig();
         pool = await database.connect();
         const repository = new MessageRepository(pool);
-        const queue = await repository.listarFilaPendente(config);
+        const queue = await withTimeout(
+            repository.listarFilaPendente(config),
+            25000,
+            'Consulta da fila excedeu o tempo limite.'
+        );
         res.json({ queue });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        const status = error.code === 'QUEUE_TIMEOUT' ? 503 : 500;
+        res.status(status).json({ error: error.message });
     } finally {
         if (pool) pool.close();
     }
@@ -394,11 +454,11 @@ function logPayloadFailure(context, msg, payload, error) {
 }
 
 async function validarAgendamentoParaEnvio(repository, msg, config, context) {
-    const validacao = await repository.validarAgendamentoAntesDoEnvio(msg.intAgendaId, config);
-    if (validacao.valido) return true;
+    const validacao = await repository.validarAgendamentoAntesDoEnvio(msg.intAgendaId, config, msg);
+    if (validacao.valido) return validacao;
 
     logger.warn(`${context} ID ${msg.intWhatsAppEnvioId} ignorado: intAgendaId=${msg.intAgendaId}, motivo=${validacao.motivo}.`);
-    return false;
+    return validacao;
 }
 
 function estaForaDoHorario(agora, config) {
@@ -526,8 +586,13 @@ async function processarFila() {
             for (const msg of mensagens) {
                 let payload = null;
                 try {
-                    const agendamentoValido = await validarAgendamentoParaEnvio(repository, msg, config, 'Agendamento');
-                    if (!agendamentoValido) continue;
+                    setCurrentMessage(msg, 'agendamento', 'validando');
+                    const validacao = await validarAgendamentoParaEnvio(repository, msg, config, 'Agendamento');
+                    if (!validacao.valido) {
+                        workerState.currentStep = 'ignorado';
+                        addRecentEvent('ignored', msg, 'agendamento', `Agendamento ignorado: ${validacao.motivo}.`);
+                        continue;
+                    }
 
                     const telefoneFinal = formatters.limparTelefone(msg.strtelefone, config);
 
@@ -546,11 +611,15 @@ async function processarFila() {
 
                     payload = formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados, { ...config, partnerbotIsClosed: isClosed });
 
+                    workerState.currentStep = 'enviando';
                     logger.info(`Enviando Agendamento ID ${msg.intWhatsAppEnvioId}...`);
                     await botService.enviarMensagem(payload);
+                    workerState.currentStep = 'marcando_enviado';
                     await repository.marcarComoEnviado(msg.intWhatsAppEnvioId, config);
+                    addRecentEvent('sent', msg, 'agendamento', 'Mensagem de agendamento enviada.');
                     logger.info(`Sucesso Agendamento ID: ${msg.intWhatsAppEnvioId}`);
                 } catch (error) {
+                    addRecentEvent('error', msg, 'agendamento', error.message);
                     logPayloadFailure('Falha Agendamento', msg, payload, error);
 
                     try {
@@ -561,6 +630,7 @@ async function processarFila() {
                 }
 
                 if (config.sendIntervalSeconds > 0) {
+                    workerState.currentStep = 'aguardando_intervalo';
                     await sleep(config.sendIntervalSeconds * 1000);
                 }
             }
@@ -591,8 +661,13 @@ async function processarFila() {
             for (const msg of confirmacoes) {
                 let payload = null;
                 try {
-                    const agendamentoValido = await validarAgendamentoParaEnvio(repository, msg, config, 'Lembrete');
-                    if (!agendamentoValido) continue;
+                    setCurrentMessage(msg, usarTemplateAgendamentoParaConfirmacao ? 'confirmacao_fallback_agendamento' : 'confirmacao', 'validando');
+                    const validacao = await validarAgendamentoParaEnvio(repository, msg, config, 'Lembrete');
+                    if (!validacao.valido) {
+                        workerState.currentStep = 'ignorado';
+                        addRecentEvent('ignored', msg, 'confirmacao', `Lembrete ignorado: ${validacao.motivo}.`);
+                        continue;
+                    }
 
                     const telefoneFinal = formatters.limparTelefone(msg.strtelefone, config);
 
@@ -614,11 +689,15 @@ async function processarFila() {
                         ? formatters.montarPayloadAgendamento(telefoneFinal, dadosFormatados, payloadConfig)
                         : formatters.montarPayloadConfirmacao(telefoneFinal, dadosFormatados, msg.Link || '-', payloadConfig);
 
+                    workerState.currentStep = 'enviando';
                     logger.info(`Enviando Lembrete ID ${msg.intWhatsAppEnvioId}${usarTemplateAgendamentoParaConfirmacao ? ' com template de agendamento' : ''}...`);
                     await botService.enviarMensagem(payload);
+                    workerState.currentStep = 'marcando_enviado';
                     await repository.marcarConfirmacaoComoEnviada(msg.intWhatsAppEnvioId, config);
+                    addRecentEvent('sent', msg, usarTemplateAgendamentoParaConfirmacao ? 'confirmacao_fallback_agendamento' : 'confirmacao', 'Confirmação de presença enviada.');
                     logger.info(`Lembrete enviado ID: ${msg.intWhatsAppEnvioId}`);
                 } catch (error) {
+                    addRecentEvent('error', msg, 'confirmacao', error.message);
                     logPayloadFailure('Falha Lembrete', msg, payload, error);
 
                     try {
@@ -629,6 +708,7 @@ async function processarFila() {
                 }
 
                 if (config.sendIntervalSeconds > 0) {
+                    workerState.currentStep = 'aguardando_intervalo';
                     await sleep(config.sendIntervalSeconds * 1000);
                 }
             }
@@ -644,6 +724,7 @@ async function processarFila() {
         workerState.lastCycleResult = `Erro geral: ${err.message}`;
     } finally {
         if (pool) pool.close();
+        clearCurrentMessage();
         isProcessing = false;
     }
 }

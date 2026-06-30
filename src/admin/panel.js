@@ -249,35 +249,39 @@ function renderAdminPage(basePath) {
   <style>
     :root {
       color-scheme: light;
-      font-family: Arial, sans-serif;
-      --bg: #f5f5f5;
+      font-family: Arial, "Segoe UI", sans-serif;
+      --bg: #f4f6fb;
       --panel: #ffffff;
-      --line: #d7dcf1;
-      --text: #10227e;
-      --muted: #4a5a9a;
+      --line: #d9e0ee;
+      --text: #111827;
+      --muted: #667085;
       --primary: #10227e;
       --accent: #ff7900;
       --danger: #b42318;
       --ok: #067647;
       --warn: #b54708;
-      --soft: #e8ecff;
+      --soft: #eef2ff;
+      --surface: #f8fafc;
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text); }
-    header { background: var(--primary); color: #fff; padding: 18px 24px; }
-    header .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1160px; margin: 0 auto; }
+    header { background: #0f2175; color: #fff; padding: 18px 24px; box-shadow: 0 14px 28px rgba(16, 34, 126, .18); }
+    header .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1240px; margin: 0 auto; }
     header h1 { margin: 0; font-size: 22px; }
     header a { color: #fff; text-decoration: none; border: 1px solid rgba(255,255,255,.45); border-radius: 6px; padding: 8px 10px; font-size: 14px; }
     a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid rgba(255, 121, 0, .35); outline-offset: 2px; }
-    main { max-width: 1160px; margin: 0 auto; padding: 24px; }
-    section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px; margin-bottom: 18px; }
-    h2 { font-size: 20px; margin: 0 0 14px; letter-spacing: .2px; }
+    main { max-width: 1240px; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 18px; box-shadow: 0 10px 26px rgba(16, 24, 40, .06); }
+    h2 { font-size: 22px; margin: 0 0 14px; letter-spacing: .2px; }
     h3 { font-size: 16px; margin: 0; letter-spacing: .1px; }
+    .status-section { order: 1; }
+    .queue-section { order: 2; }
+    .config-section { order: 3; }
     .section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
     .section-head p { color: var(--muted); margin: 4px 0 0; font-size: 13px; }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-    .status { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-    .stat { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #fbfcfd; box-shadow: 0 8px 18px rgba(16, 34, 126, .05); }
+    .status { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
+    .stat { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--surface); box-shadow: none; min-height: 74px; }
     .stat span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
     .stat strong { font-size: 16px; }
     .pill { display: inline-flex; align-items: center; min-height: 26px; border-radius: 999px; padding: 4px 10px; background: var(--soft); color: var(--primary); font-size: 12px; font-weight: 700; }
@@ -290,12 +294,19 @@ function renderAdminPage(basePath) {
     .icon-btn { min-height: 40px; border: 1px solid rgba(255,255,255,.45); border-radius: 999px; background: rgba(7, 15, 58, .34); color: #ffffff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: transform .12s ease, background .18s ease, border-color .18s ease; padding: 0 14px; font-size: 13px; font-weight: 700; letter-spacing: .15px; }
     .icon-btn:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.75); }
     .icon-btn:active { transform: translateY(1px); }
-    .config-section { background: transparent; border: 0; padding: 0; }
-    .config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-    .config-group { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; box-shadow: 0 8px 20px rgba(16, 34, 126, .05); }
+    .config-section { background: transparent; border: 0; padding: 0; box-shadow: none; }
+    .config-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "templates templates" "hours producer" "safety safety" "payload payload"; gap: 16px; align-items: stretch; }
+    .config-group { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; box-shadow: 0 8px 20px rgba(16, 34, 126, .05); min-height: 100%; }
+    .config-group.templates { grid-area: templates; }
+    .config-group.hours { grid-area: hours; }
+    .config-group.producer { grid-area: producer; }
+    .config-group.safety { grid-area: safety; }
+    .config-group.payload { grid-area: payload; }
     .config-group.wide { grid-column: 1 / -1; }
     .group-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
     .field-stack { display: grid; gap: 12px; }
+    .field-stack.two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+    .field-span-2 { grid-column: 1 / -1; }
     .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 6px; }
     input[type="text"], input[type="number"], input[type="date"] { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 14px; background: #fff; color: var(--text); transition: border-color .18s ease, box-shadow .18s ease; }
@@ -326,6 +337,40 @@ function renderAdminPage(basePath) {
     th, td { border-bottom: 1px solid var(--line); padding: 9px 8px; text-align: left; white-space: nowrap; }
     th { color: var(--muted); font-weight: 700; background: #fbfcfd; }
     td.name { white-space: normal; min-width: 220px; }
+    .queue-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+    .queue-column { display: grid; grid-template-rows: 32px 150px 156px 430px; gap: 12px; min-width: 0; }
+    .queue-column-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .queue-column-title h3 { font-size: 18px; color: var(--text); }
+    .queue-card { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px; min-height: 0; overflow: hidden; }
+    .queue-card.active { border-color: rgba(255, 121, 0, .6); background: #fff7ed; box-shadow: inset 0 0 0 1px rgba(255, 121, 0, .12); }
+    .queue-card.next { height: 156px; }
+    .queue-card.queue-list-card { height: 430px; }
+    .queue-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+    .queue-name { font-size: 21px; line-height: 1.2; font-weight: 800; color: var(--text); margin-bottom: 8px; word-break: break-word; }
+    .queue-meta { display: flex; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 13px; line-height: 1.35; }
+    .queue-meta span { border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; background: #fff; }
+    .queue-step { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 9px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; }
+    .queue-empty { color: var(--muted); font-size: 14px; line-height: 1.45; min-height: 72px; display: flex; align-items: center; }
+    .queue-list { display: grid; gap: 8px; }
+    .queue-scroll { align-content: start; height: 350px; overflow-y: auto; padding-right: 4px; scrollbar-gutter: stable; }
+    .queue-scroll::-webkit-scrollbar, .event-scroll::-webkit-scrollbar { width: 8px; }
+    .queue-scroll::-webkit-scrollbar-thumb, .event-scroll::-webkit-scrollbar-thumb { background: #c8d1e3; border-radius: 999px; }
+    .queue-scroll::-webkit-scrollbar-track, .event-scroll::-webkit-scrollbar-track { background: transparent; }
+    .queue-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 9px; background: #fff; padding: 10px; }
+    .queue-index { width: 28px; height: 28px; border-radius: 999px; display: inline-grid; place-items: center; background: var(--soft); color: var(--primary); font-weight: 800; font-size: 12px; }
+    .queue-row strong { display: block; font-size: 14px; line-height: 1.25; color: var(--text); margin-bottom: 3px; word-break: break-word; }
+    .queue-row small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .event-list { display: grid; gap: 8px; margin-top: 16px; }
+    .event-scroll { align-content: start; max-height: 180px; min-height: 180px; overflow-y: auto; padding-right: 4px; scrollbar-gutter: stable; }
+    .events-panel { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 14px; margin-top: 16px; min-height: 270px; }
+    .events-panel h3 { font-size: 16px; margin-bottom: 4px; }
+    .events-panel p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+    .event-row { border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; background: #fff; padding: 9px 10px; }
+    .event-row.sent { border-left-color: var(--ok); }
+    .event-row.ignored { border-left-color: #667085; }
+    .event-row.error { border-left-color: var(--danger); }
+    .event-row strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
+    .event-row small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
     .modal-backdrop { position: fixed; inset: 0; background: rgba(16, 24, 40, .45); display: grid; place-items: center; padding: 16px; }
     .modal-backdrop.hidden { display: none; }
     .modal { width: min(520px, 100%); background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 16px; box-shadow: 0 25px 50px rgba(16, 24, 40, .28); }
@@ -334,7 +379,12 @@ function renderAdminPage(basePath) {
     .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
     @media (max-width: 760px) {
       main { padding: 14px; }
-      .grid, .status, .config-grid, .field-row { grid-template-columns: 1fr; }
+      .grid, .status, .config-grid, .field-row, .field-stack.two-col { grid-template-columns: 1fr; }
+      .config-grid { grid-template-areas: "templates" "hours" "producer" "safety" "payload"; }
+      .queue-board { grid-template-columns: 1fr; }
+      .queue-column { grid-template-rows: 32px 150px 156px 430px; }
+      .queue-row { grid-template-columns: 30px 1fr; }
+      .queue-row .pill { grid-column: 2; width: fit-content; }
       header .topbar { align-items: flex-start; flex-direction: column; }
       .header-actions { width: 100%; justify-content: space-between; }
       .client-badge { width: 100%; justify-content: center; }
@@ -361,7 +411,7 @@ function renderAdminPage(basePath) {
     </div>
   </header>
   <main>
-    <section>
+    <section class="status-section">
       <div class="section-head">
         <div>
           <h2>Status operacional</h2>
@@ -374,6 +424,8 @@ function renderAdminPage(basePath) {
         <div class="stat"><span>Ultimo ciclo</span><strong id="lastCycle">-</strong></div>
         <div class="stat"><span>Resultado</span><strong id="lastResult">-</strong></div>
         <div class="stat"><span>Fila criada</span><strong id="queueProduced">-</strong></div>
+        <div class="stat"><span>Agendamentos pendentes</span><strong id="schedulePendingStat">0</strong></div>
+        <div class="stat"><span>Confirmacoes pendentes</span><strong id="confirmationPendingStat">0</strong></div>
       </div>
       <div class="actions">
         <button id="resumeBtn">Retomar</button>
@@ -395,12 +447,12 @@ function renderAdminPage(basePath) {
       </div>
       <form id="configForm">
         <div class="config-grid">
-          <div class="config-group">
+          <div class="config-group templates">
             <div class="group-title">
               <h3>Templates</h3>
               <span class="pill">PartnerBot</span>
             </div>
-            <div class="field-stack">
+            <div class="field-stack two-col">
               <div>
                 <label for="templateNewSchedule">Agendamento realizado</label>
                 <input id="templateNewSchedule" name="templateNewSchedule" type="text">
@@ -419,7 +471,7 @@ function renderAdminPage(basePath) {
                 <input id="showticketUrl" name="showticketUrl" type="text" placeholder="https://.../showticket">
                 <small class="helper">Sobrescreve o .env. Se vazio, deriva da URL da API.</small>
               </div>
-              <div>
+              <div class="field-span-2">
                 <label for="partnerbotAuthToken">Token PartnerBot (opcional)</label>
                 <input id="partnerbotAuthToken" name="partnerbotAuthToken" type="text" autocomplete="off" placeholder="Bearer ...">
                 <small class="helper">Se preenchido, sobrescreve o token do .env para esta instancia.</small>
@@ -435,7 +487,7 @@ function renderAdminPage(basePath) {
             </div>
           </div>
 
-          <div class="config-group">
+          <div class="config-group hours">
             <div class="group-title">
               <h3>Janela de envio</h3>
               <span class="pill">Brasil</span>
@@ -464,7 +516,7 @@ function renderAdminPage(basePath) {
             </div>
           </div>
 
-          <div class="config-group">
+          <div class="config-group producer">
             <div class="group-title">
               <h3>Produtor de fila</h3>
               <span class="pill">Agenda</span>
@@ -492,20 +544,16 @@ function renderAdminPage(basePath) {
             </div>
           </div>
 
-          <div class="config-group">
+          <div class="config-group safety">
             <div class="group-title">
               <h3>Modo seguro</h3>
               <span class="pill">Operacao</span>
             </div>
-            <div class="field-stack">
+            <div class="field-stack two-col">
               <label class="toggle">
                 <input id="testModeEnabled" name="testModeEnabled" type="checkbox">
-                <span>Modo teste<small>Restringe fila e envio pelo nome do paciente.</small></span>
+                <span>Modo teste<small>Quando ativo, busca e envia apenas para pacientes com TESTE no nome.</small></span>
               </label>
-              <div>
-                <label for="testPatientNameFilter">Texto do filtro</label>
-                <input id="testPatientNameFilter" name="testPatientNameFilter" type="text">
-              </div>
               <label class="toggle">
                 <input id="skipPastAppointmentTime" name="skipPastAppointmentTime" type="checkbox">
                 <span>Ignorar horarios passados<small>Bloqueia lembretes de consultas que ja passaram.</small></span>
@@ -513,7 +561,7 @@ function renderAdminPage(basePath) {
             </div>
           </div>
 
-          <div class="config-group wide">
+          <div class="config-group wide payload">
             <div class="group-title">
               <h3>Formato do payload</h3>
               <span class="pill">WhatsApp</span>
@@ -566,31 +614,60 @@ function renderAdminPage(basePath) {
       </form>
     </section>
 
-    <section>
+    <section class="queue-section">
       <div class="section-head">
         <div>
-          <h2>Fila pendente</h2>
-          <p>Mensagens aguardando processamento e envio.</p>
+          <h2>Fila de envio</h2>
+          <p>Acompanhe o envio atual e os proximos pacientes.</p>
         </div>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Tipo</th>
-              <th>Paciente</th>
-              <th>Data</th>
-              <th>Hora</th>
-              <th>Telefone</th>
-              <th>Profissional</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="queueRows">
-            <tr><td colspan="8">Carregando...</td></tr>
-          </tbody>
-        </table>
+      <div class="queue-board">
+        <div class="queue-column">
+          <div class="queue-column-title">
+            <h3>Novos agendamentos</h3>
+            <span id="scheduleCountPill" class="pill">0</span>
+          </div>
+          <div class="queue-card active">
+            <div class="queue-label"><span>Enviando agora</span><span id="scheduleCurrentStep" class="queue-step">Aguardando</span></div>
+            <div id="scheduleCurrentBody" class="queue-empty">Nenhum envio em andamento nesta fila.</div>
+          </div>
+          <div class="queue-card next">
+            <div class="queue-label"><span>Proximo agendamento</span><span class="pill">Fila</span></div>
+            <div id="scheduleNextBody" class="queue-empty">Carregando fila...</div>
+          </div>
+          <div class="queue-card queue-list-card">
+            <div class="queue-label"><span>Proximos agendamentos</span></div>
+            <div id="scheduleQueueRows" class="queue-list queue-scroll">
+              <div class="queue-empty">Carregando fila...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="queue-column">
+          <div class="queue-column-title">
+            <h3>Confirmacoes de presenca</h3>
+            <span id="confirmationCountPill" class="pill">0</span>
+          </div>
+          <div class="queue-card active">
+            <div class="queue-label"><span>Enviando agora</span><span id="confirmationCurrentStep" class="queue-step">Aguardando</span></div>
+            <div id="confirmationCurrentBody" class="queue-empty">Nenhum envio em andamento nesta fila.</div>
+          </div>
+          <div class="queue-card next">
+            <div class="queue-label"><span>Proxima confirmacao</span><span class="pill">Fila</span></div>
+            <div id="confirmationNextBody" class="queue-empty">Carregando fila...</div>
+          </div>
+          <div class="queue-card queue-list-card">
+            <div class="queue-label"><span>Proximas confirmacoes</span></div>
+            <div id="confirmationQueueRows" class="queue-list queue-scroll">
+              <div class="queue-empty">Carregando fila...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="events-panel">
+        <h3>Ultimos eventos</h3>
+        <p>Historico recente do que foi enviado, ignorado ou falhou neste worker.</p>
+        <div class="event-list event-scroll" id="recentEvents"></div>
       </div>
     </section>
   </main>
@@ -665,7 +742,17 @@ function renderAdminPage(basePath) {
         window.location.href = withBasePath('/admin/login');
         return {};
       }
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (response.status === 504) throw new Error('Tempo esgotado ao consultar o servidor. Tente atualizar novamente em instantes.');
+        if (contentType.includes('text/html')) throw new Error('Falha no servidor ou proxy: HTTP ' + response.status);
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          throw new Error(data.error || data.message || ('Falha na requisicao: HTTP ' + response.status));
+        }
+        const text = await response.text();
+        throw new Error(text || ('Falha na requisicao: HTTP ' + response.status));
+      }
       return response.json();
     }
 
@@ -700,6 +787,10 @@ function renderAdminPage(basePath) {
       const snapshot = {};
       fields.forEach((field) => {
         const input = document.getElementById(field);
+        if (!input) {
+          snapshot[field] = field === 'testPatientNameFilter' ? 'TESTE' : initialConfig[field];
+          return;
+        }
         const raw = input.type === 'checkbox' ? input.checked : input.value;
         snapshot[field] = normalizeFieldValue(field, raw);
       });
@@ -726,7 +817,10 @@ function renderAdminPage(basePath) {
     function fillConfig(config) {
       fields.forEach((field) => {
         const input = document.getElementById(field);
-        if (!input) return;
+        if (!input) {
+          initialConfig[field] = field === 'testPatientNameFilter' ? 'TESTE' : config[field];
+          return;
+        }
         if (input.type === 'checkbox') input.checked = Boolean(config[field]);
         else input.value = config[field] ?? '';
         initialConfig[field] = normalizeFieldValue(field, input.type === 'checkbox' ? input.checked : input.value);
@@ -767,25 +861,142 @@ function renderAdminPage(basePath) {
       }[char]));
     }
 
-    function renderQueue(rows) {
-      const tbody = document.getElementById('queueRows');
-      if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="8">Nenhuma mensagem pendente.</td></tr>';
+    function typeLabel(type) {
+      const labels = {
+        agendamento: 'Mensagem de agendamento',
+        agendamento_sem_template: 'Agendamento sem template',
+        confirmacao: 'Confirmacao de presenca',
+        confirmacao_fallback_agendamento: 'Confirmacao via template de agendamento',
+        confirmacao_sem_template: 'Confirmacao sem template'
+      };
+      return labels[type] || type || 'Mensagem';
+    }
+
+    function stepLabel(step) {
+      const labels = {
+        idle: 'Aguardando',
+        validando: 'Validando',
+        enviando: 'Enviando',
+        marcando_enviado: 'Finalizando',
+        aguardando_intervalo: 'Aguardando intervalo',
+        ignorado: 'Ignorado'
+      };
+      return labels[step] || 'Aguardando';
+    }
+
+    function eventLabel(status) {
+      const labels = {
+        sent: 'Enviado',
+        ignored: 'Ignorado',
+        error: 'Falha'
+      };
+      return labels[status] || status || 'Evento';
+    }
+
+    function queueStatusLabel(row) {
+      const sent = String(row.bolEnviado || 'N').toUpperCase() === 'S';
+      const confirmed = String(row.bolConfirma || 'N').toUpperCase() === 'S';
+      if (confirmed) return 'Confirmado';
+      if (sent) return 'Aguardando confirmacao';
+      return 'Aguardando envio';
+    }
+
+    function isScheduleType(type) {
+      return ['agendamento', 'agendamento_sem_template'].includes(type);
+    }
+
+    function isConfirmationType(type) {
+      return ['confirmacao', 'confirmacao_fallback_agendamento', 'confirmacao_sem_template'].includes(type);
+    }
+
+    function queueKind(row) {
+      const type = row?.tipoFila || row?.tipo || '';
+      if (isScheduleType(type)) return 'schedule';
+      if (isConfirmationType(type)) return 'confirmation';
+      return 'unknown';
+    }
+
+    function queueMeta(row) {
+      const parts = [];
+      if (row.datagenda) parts.push(clientEscapeHtml(row.datagenda));
+      if (row.strHora) parts.push(clientEscapeHtml(row.strHora));
+      if (row.strTelefone) parts.push(clientEscapeHtml(row.strTelefone));
+      if (row.strProfissional) parts.push(clientEscapeHtml(row.strProfissional));
+      return parts.map((part) => '<span>' + part + '</span>').join('');
+    }
+
+    function renderMessageCard(row, emptyText) {
+      if (!row) return '<div class="queue-empty">' + clientEscapeHtml(emptyText) + '</div>';
+      return (
+        '<div class="queue-name">' + clientEscapeHtml(row.strAgenda || 'Paciente sem nome') + '</div>' +
+        '<div class="queue-meta">' +
+          '<span>' + clientEscapeHtml(typeLabel(row.tipoFila || row.tipo)) + '</span>' +
+          queueMeta(row) +
+        '</div>'
+      );
+    }
+
+    function renderCurrentForQueue(status, kind) {
+      const current = queueKind(status.currentMessage) === kind ? status.currentMessage : null;
+      const prefix = kind === 'schedule' ? 'schedule' : 'confirmation';
+      document.getElementById(prefix + 'CurrentStep').textContent = current ? stepLabel(status.currentStep) : 'Aguardando';
+      document.getElementById(prefix + 'CurrentBody').innerHTML = renderMessageCard(current, 'Nenhum envio em andamento nesta fila.');
+    }
+
+    function renderEvents(events) {
+      const container = document.getElementById('recentEvents');
+      if (!events || !events.length) {
+        container.innerHTML = '<div class="queue-empty">Nenhum evento recente neste worker.</div>';
         return;
       }
 
-      tbody.innerHTML = rows.map((row) => (
-        '<tr>' +
-          '<td>' + clientEscapeHtml(row.intWhatsAppEnvioId) + '</td>' +
-          '<td>' + clientEscapeHtml(row.tipoFila) + '</td>' +
-          '<td class="name">' + clientEscapeHtml(row.strAgenda) + '</td>' +
-          '<td>' + clientEscapeHtml(row.datagenda) + '</td>' +
-          '<td>' + clientEscapeHtml(row.strHora) + '</td>' +
-          '<td>' + clientEscapeHtml(row.strTelefone) + '</td>' +
-          '<td>' + clientEscapeHtml(row.strProfissional) + '</td>' +
-          '<td>' + clientEscapeHtml(row.bolEnviado) + '/' + clientEscapeHtml(row.bolConfirma) + '</td>' +
-        '</tr>'
+      container.innerHTML = events.map((event) => {
+        const msg = event.message || {};
+        const time = event.at ? new Date(event.at).toLocaleTimeString() : '-';
+        return (
+          '<div class="event-row ' + clientEscapeHtml(event.status) + '">' +
+            '<strong>' + clientEscapeHtml(eventLabel(event.status)) + ' - ' + clientEscapeHtml(msg.strAgenda || 'Paciente') + '</strong>' +
+            '<small>' + clientEscapeHtml(time) + ' | ' + clientEscapeHtml(typeLabel(msg.tipo)) + (event.detail ? ' | ' + clientEscapeHtml(event.detail) : '') + '</small>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function renderQueueColumn(rows, status, kind) {
+      const prefix = kind === 'schedule' ? 'schedule' : 'confirmation';
+      const list = document.getElementById(prefix + 'QueueRows');
+      const currentId = status.currentMessage ? status.currentMessage.intWhatsAppEnvioId : null;
+      const filteredRows = rows.filter((row) => queueKind(row) === kind);
+      const visibleRows = filteredRows.filter((row) => row.intWhatsAppEnvioId !== currentId);
+      const nextRow = visibleRows[0] || null;
+      const emptyText = kind === 'schedule' ? 'Nenhum agendamento pendente.' : 'Nenhuma confirmacao pendente.';
+
+      renderCurrentForQueue(status, kind);
+      document.getElementById(prefix + 'CountPill').textContent = String(visibleRows.length);
+      document.getElementById(prefix + 'PendingStat').textContent = String(visibleRows.length);
+      document.getElementById(prefix + 'NextBody').innerHTML = renderMessageCard(nextRow, kind === 'schedule' ? 'Nenhum proximo agendamento.' : 'Nenhuma proxima confirmacao.');
+
+      if (!visibleRows.length) {
+        list.innerHTML = '<div class="queue-empty">' + emptyText + '</div>';
+        return;
+      }
+
+      list.innerHTML = visibleRows.map((row, index) => (
+        '<div class="queue-row">' +
+          '<span class="queue-index">' + clientEscapeHtml(index + 1) + '</span>' +
+          '<div>' +
+            '<strong>' + clientEscapeHtml(row.strAgenda || 'Paciente sem nome') + '</strong>' +
+            '<small>' + clientEscapeHtml(typeLabel(row.tipoFila)) + ' | ' + clientEscapeHtml(row.datagenda || '-') + ' ' + clientEscapeHtml(row.strHora || '') + ' | ' + clientEscapeHtml(row.strProfissional || '-') + '</small>' +
+          '</div>' +
+          '<span class="pill">' + clientEscapeHtml(queueStatusLabel(row)) + '</span>' +
+        '</div>'
       )).join('');
+    }
+
+    function renderQueue(rows, status) {
+      renderQueueColumn(rows, status, 'schedule');
+      renderQueueColumn(rows, status, 'confirmation');
+      renderEvents(status.recentEvents || []);
     }
 
     async function refresh() {
@@ -793,7 +1004,7 @@ function renderAdminPage(basePath) {
       if (!data.config) return;
       renderStatus(data);
       const queueData = await api(withBasePath('/api/admin/queue'));
-      renderQueue(queueData.queue || []);
+      renderQueue(queueData.queue || [], data);
     }
 
     document.getElementById('refreshBtn').addEventListener('click', () => refresh().catch((err) => setMessage(err.message, false)));
@@ -854,6 +1065,10 @@ function renderAdminPage(basePath) {
         const payload = {};
         fields.forEach((field) => {
           const input = document.getElementById(field);
+          if (!input) {
+            payload[field] = field === 'testPatientNameFilter' ? 'TESTE' : initialConfig[field];
+            return;
+          }
           payload[field] = input.type === 'checkbox' ? input.checked : input.value;
         });
         payload.businessHoursStart = Number(payload.businessHoursStart);
@@ -878,6 +1093,7 @@ function renderAdminPage(basePath) {
 
     fields.forEach((field) => {
       const input = document.getElementById(field);
+      if (!input) return;
       input.addEventListener('input', updateSaveState);
       input.addEventListener('change', updateSaveState);
     });
