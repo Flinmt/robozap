@@ -9,6 +9,69 @@ class MessageRepository {
         return null;
     }
 
+    async validarAgendamentoAntesDoEnvio(intAgendaId, config = {}) {
+        const querySelect = `
+            SELECT TOP 1
+                a.intAgendaId,
+                a.strAgenda,
+                a.bolBloqueado,
+                a.datAgendamento,
+                a.strHora,
+                CONVERT(varchar(10), a.datAgendamento, 120) AS dataAgendamentoIso,
+                CASE
+                    WHEN @skipPastAppointmentTime = 1
+                     AND ISNULL(
+                        TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                        a.datAgendamento
+                     ) < GETDATE()
+                    THEN 1
+                    ELSE 0
+                END AS horarioPassado,
+                COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa
+            FROM vwAgenda a
+            LEFT JOIN tblAgenda TA ON TA.intAgendaId = a.intAgendaId
+            LEFT JOIN tblEmpresa EUnidade ON EUnidade.intEmpresaId = TA.intUnidadeId
+            LEFT JOIN tblEmpresa EVw ON EVw.intEmpresaId = a.intEmpresaId
+            WHERE a.intAgendaId = @intAgendaId
+        `;
+
+        const result = await this.pool.request()
+            .input('intAgendaId', sql.Int, intAgendaId)
+            .input('skipPastAppointmentTime', sql.Bit, config.skipPastAppointmentTime ? 1 : 0)
+            .query(querySelect);
+
+        const agenda = result.recordset[0];
+        if (!agenda) return { valido: false, motivo: 'slot_nao_encontrado' };
+
+        const nomePaciente = String(agenda.strAgenda || '').trim();
+        if (!nomePaciente) return { valido: false, motivo: 'slot_sem_paciente' };
+
+        const bloqueado = String(agenda.bolBloqueado ?? 'N').trim().toUpperCase();
+        if (bloqueado === 'S' || bloqueado === '1') return { valido: false, motivo: 'slot_bloqueado' };
+
+        const companyName = this.getCompanyName(config);
+        if (companyName && String(agenda.strEmpresa || '').trim().toUpperCase() !== String(companyName).trim().toUpperCase()) {
+            return { valido: false, motivo: 'empresa_divergente' };
+        }
+
+        if (config.messagingStartDate) {
+            const dataAgendamento = String(agenda.dataAgendamentoIso || '').slice(0, 10);
+            if (dataAgendamento && dataAgendamento < config.messagingStartDate) {
+                return { valido: false, motivo: 'antes_data_inicio_mensageria' };
+            }
+        }
+
+        if (Number(agenda.horarioPassado) === 1) {
+            return { valido: false, motivo: 'horario_agendamento_passado' };
+        }
+
+        if (config.testModeEnabled && !nomePaciente.toUpperCase().includes(String(config.testPatientNameFilter || 'TESTE').toUpperCase())) {
+            return { valido: false, motivo: 'fora_filtro_teste' };
+        }
+
+        return { valido: true, motivo: 'ok' };
+    }
+
     async gerarFilaAgendamentos(config) {
         const queryInsert = `
             DECLARE @created TABLE (intWhatsAppEnvioId int);
@@ -123,7 +186,7 @@ class MessageRepository {
                     w.intWhatsAppEnvioId,
                     w.intAgendaId,
                     w.strTipo,
-                    CASE WHEN a.strAgenda = '' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
+                    a.strAgenda,
                     w.strTelefone,
                     IsNull(w.bolEnviado,'N') AS bolEnviado,
                     IsNull(w.bolConfirma,'N') AS bolConfirma,
@@ -225,6 +288,8 @@ class MessageRepository {
                     IsNull(w.bolEnviado,'N') NOT IN ('S')
                     OR IsNull(w.bolConfirma,'N') NOT IN ('S')
                   )
+                  AND NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
+                  AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
                   AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
                   AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
                   AND (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
@@ -274,7 +339,7 @@ class MessageRepository {
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
                 w.strTipo,
-                CASE WHEN a.strAgenda='' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
+                a.strAgenda,
                 w.intWhatsAppEnvioId, 
                 w.intAgendaId,
                 convert(varchar, a.datAgendamento, 103) as datagenda, 
@@ -295,10 +360,12 @@ class MessageRepository {
             and w.bolMensagemErro = 0
             and w.strTipo IN ('AgendaInicio', 'agendainicio')
             and len(w.strTelefone) >= 10 
+            and NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
+            and ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
             and CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE() + 1)
             and (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
             and (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-            and (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter OR W.strAgenda LIKE @testNameFilter)
+            and (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
             order by a.datAgendamento
         `;
 
@@ -337,7 +404,7 @@ class MessageRepository {
             )
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
-                CASE WHEN a.strAgenda='' THEN W.strAgenda ELSE a.strAgenda END strAgenda,
+                a.strAgenda,
                 w.intWhatsAppEnvioId, 
                 w.intAgendaId,
                 convert(varchar, a.datAgendamento, 103) as datagenda, 
@@ -361,6 +428,8 @@ class MessageRepository {
             where IsNull(w.bolConfirma,'N') NOT IN ('S')
             and w.bolMensagemErro = 0
             and len(w.strTelefone) >= 10 
+            and NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
+            and ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
             and (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
             
             -- Lógica complexa de envio:
@@ -381,7 +450,7 @@ class MessageRepository {
                     a.datAgendamento
                 ) >= GETDATE()
             )
-            and (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter OR W.strAgenda LIKE @testNameFilter)
+            and (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
             order by a.datAgendamento
         `;
 

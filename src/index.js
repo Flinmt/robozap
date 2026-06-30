@@ -393,6 +393,14 @@ function logPayloadFailure(context, msg, payload, error) {
     logger.error(`${context} payload resumo ID ${msg.intWhatsAppEnvioId}: template=${template?.name || '-'}, numero=${payload?.number || '-'}, isClosed=${payload?.isClosed}, parametros=${parameters.length}, valores=${JSON.stringify(parameters.map((parameter) => parameter.text))}`);
 }
 
+async function validarAgendamentoParaEnvio(repository, msg, config, context) {
+    const validacao = await repository.validarAgendamentoAntesDoEnvio(msg.intAgendaId, config);
+    if (validacao.valido) return true;
+
+    logger.warn(`${context} ID ${msg.intWhatsAppEnvioId} ignorado: intAgendaId=${msg.intAgendaId}, motivo=${validacao.motivo}.`);
+    return false;
+}
+
 function estaForaDoHorario(agora, config) {
     const options = { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false };
     const horaStr = new Intl.DateTimeFormat('en-US', options).format(agora);
@@ -518,6 +526,9 @@ async function processarFila() {
             for (const msg of mensagens) {
                 let payload = null;
                 try {
+                    const agendamentoValido = await validarAgendamentoParaEnvio(repository, msg, config, 'Agendamento');
+                    if (!agendamentoValido) continue;
+
                     const telefoneFinal = formatters.limparTelefone(msg.strtelefone, config);
 
                     if (!telefoneFinal || telefoneFinal.length < 10) {
@@ -580,6 +591,9 @@ async function processarFila() {
             for (const msg of confirmacoes) {
                 let payload = null;
                 try {
+                    const agendamentoValido = await validarAgendamentoParaEnvio(repository, msg, config, 'Lembrete');
+                    if (!agendamentoValido) continue;
+
                     const telefoneFinal = formatters.limparTelefone(msg.strtelefone, config);
 
                     if (!telefoneFinal || telefoneFinal.length < 10) {
