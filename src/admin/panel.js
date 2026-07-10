@@ -357,6 +357,7 @@ function renderAdminPage(basePath) {
     .queue-scroll::-webkit-scrollbar-thumb, .event-scroll::-webkit-scrollbar-thumb { background: #c8d1e3; border-radius: 999px; }
     .queue-scroll::-webkit-scrollbar-track, .event-scroll::-webkit-scrollbar-track { background: transparent; }
     .queue-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 9px; background: #fff; padding: 10px; }
+    .queue-row.warning { border-color: #f59e0b; background: #fffbeb; }
     .queue-index { width: 28px; height: 28px; border-radius: 999px; display: inline-grid; place-items: center; background: var(--soft); color: var(--primary); font-weight: 800; font-size: 12px; }
     .queue-row strong { display: block; font-size: 14px; line-height: 1.25; color: var(--text); margin-bottom: 3px; word-break: break-word; }
     .queue-row small { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
@@ -922,6 +923,7 @@ function renderAdminPage(basePath) {
       if (row.strHora) parts.push(clientEscapeHtml(row.strHora));
       if (row.strTelefone) parts.push(clientEscapeHtml(row.strTelefone));
       if (row.strProfissional) parts.push(clientEscapeHtml(row.strProfissional));
+      if (row.divergenciaAgenda) parts.push('Divergencia: ' + clientEscapeHtml(row.divergenciaAgenda));
       return parts.map((part) => '<span>' + part + '</span>').join('');
     }
 
@@ -982,11 +984,11 @@ function renderAdminPage(basePath) {
       }
 
       list.innerHTML = visibleRows.map((row, index) => (
-        '<div class="queue-row">' +
+        '<div class="queue-row' + (row.divergenciaAgenda ? ' warning' : '') + '">' +
           '<span class="queue-index">' + clientEscapeHtml(index + 1) + '</span>' +
           '<div>' +
             '<strong>' + clientEscapeHtml(row.strAgenda || 'Paciente sem nome') + '</strong>' +
-            '<small>' + clientEscapeHtml(typeLabel(row.tipoFila)) + ' | ' + clientEscapeHtml(row.datagenda || '-') + ' ' + clientEscapeHtml(row.strHora || '') + ' | ' + clientEscapeHtml(row.strProfissional || '-') + '</small>' +
+            '<small>' + clientEscapeHtml(typeLabel(row.tipoFila)) + ' | ' + clientEscapeHtml(row.datagenda || '-') + ' ' + clientEscapeHtml(row.strHora || '') + ' | ' + clientEscapeHtml(row.strProfissional || '-') + (row.divergenciaAgenda ? ' | Divergencia: ' + clientEscapeHtml(row.divergenciaAgenda) : '') + '</small>' +
           '</div>' +
           '<span class="pill">' + clientEscapeHtml(queueStatusLabel(row)) + '</span>' +
         '</div>'

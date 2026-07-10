@@ -9,11 +9,18 @@ class MessageRepository {
         return null;
     }
 
+    normalizeSnapshotText(value) {
+        return String(value || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    }
+
     async validarAgendamentoAntesDoEnvio(intAgendaId, config = {}, queueMessage = {}) {
         const querySelect = `
             SELECT TOP 1
+                COUNT(1) OVER () AS totalLinhasAgenda,
                 a.intAgendaId,
                 a.strAgenda,
+                a.strProfissional,
+                currentPhone.finalPhone AS strTelefoneAtual,
                 a.bolBloqueado,
                 a.datAgendamento,
                 a.strHora,
@@ -31,6 +38,25 @@ class MessageRepository {
             LEFT JOIN tblEmpresa EUnidade ON EUnidade.intEmpresaId = TA.intUnidadeId
             LEFT JOIN tblEmpresa EVw ON EVw.intEmpresaId = a.intEmpresaId
             CROSS APPLY (
+                SELECT telefoneLimpo = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(a.strTelefone, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', ''), '/', '')
+            ) telefone
+            CROSS APPLY (
+                SELECT celularLimpo = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(a.strCelular, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', ''), '/', '')
+            ) celular
+            CROSS APPLY (
+                SELECT rawPhone = CASE
+                    WHEN LEN(celular.celularLimpo) >= 10 THEN celular.celularLimpo
+                    ELSE telefone.telefoneLimpo
+                END
+            ) sourcePhone
+            CROSS APPLY (
+                SELECT finalPhone = CASE
+                    WHEN LEN(sourcePhone.rawPhone) > 11 AND LEFT(sourcePhone.rawPhone, 2) = '55'
+                        THEN SUBSTRING(sourcePhone.rawPhone, 3, 20)
+                    ELSE sourcePhone.rawPhone
+                END
+            ) currentPhone
+            CROSS APPLY (
                 SELECT appointmentAt = ISNULL(
                     TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
                     a.datAgendamento
@@ -46,9 +72,28 @@ class MessageRepository {
 
         const agenda = result.recordset[0];
         if (!agenda) return { valido: false, motivo: 'slot_nao_encontrado' };
+        if (Number(agenda.totalLinhasAgenda) > 1) return { valido: false, motivo: 'agenda_duplicada' };
 
         const nomePaciente = String(agenda.strAgenda || '').trim();
         if (!nomePaciente) return { valido: false, motivo: 'slot_sem_paciente' };
+
+        const pacienteFila = String(queueMessage.strAgenda || '').trim();
+        if (!pacienteFila) return { valido: false, motivo: 'fila_sem_paciente' };
+        if (this.normalizeSnapshotText(pacienteFila) !== this.normalizeSnapshotText(agenda.strAgenda)) {
+            return { valido: false, motivo: 'paciente_divergente' };
+        }
+
+        const profissionalFila = String(queueMessage.strProfissional || '').trim();
+        if (profissionalFila && this.normalizeSnapshotText(profissionalFila) !== this.normalizeSnapshotText(agenda.strProfissional)) {
+            return { valido: false, motivo: 'profissional_divergente' };
+        }
+
+        const telefoneFila = String(queueMessage.strtelefone || queueMessage.strTelefone || '').replace(/\D/g, '');
+        const telefoneFilaSemPais = telefoneFila.startsWith('55') ? telefoneFila.slice(2) : telefoneFila;
+        if (!telefoneFilaSemPais) return { valido: false, motivo: 'fila_sem_telefone' };
+        if (telefoneFilaSemPais !== String(agenda.strTelefoneAtual || '')) {
+            return { valido: false, motivo: 'telefone_divergente' };
+        }
 
         if (queueMessage.datDataAlerta) {
             const dataFila = queueMessage.datDataAlerta instanceof Date
@@ -133,8 +178,8 @@ class MessageRepository {
             ) celular
             CROSS APPLY (
                 SELECT rawPhone = CASE
-                    WHEN LEN(telefone.telefoneLimpo) >= 10 THEN telefone.telefoneLimpo
-                    ELSE celular.celularLimpo
+                    WHEN LEN(celular.celularLimpo) >= 10 THEN celular.celularLimpo
+                    ELSE telefone.telefoneLimpo
                 END
             ) sourcePhone
             CROSS APPLY (
@@ -201,20 +246,27 @@ class MessageRepository {
                     w.intWhatsAppEnvioId,
                     w.intAgendaId,
                     w.strTipo,
-                    a.strAgenda,
+                    w.strAgenda,
                     w.strTelefone,
                     IsNull(w.bolEnviado,'N') AS bolEnviado,
                     IsNull(w.bolConfirma,'N') AS bolConfirma,
                     w.bolMensagemErro,
-                    convert(varchar, a.datAgendamento, 103) as datagenda,
-                    a.datAgendamento,
-                    a.strHora,
-                    a.strProfissional,
-                    a.strEspecialidadeMedica,
+                    convert(varchar, w.datDataAlerta, 103) as datagenda,
+                    w.datDataAlerta AS datAgendamento,
+                    CONVERT(varchar(5), w.datDataAlerta, 108) AS strHora,
+                    w.strProfissional,
+                    COALESCE(NULLIF(LTRIM(RTRIM(w.strProcedimento)), ''), a.strEspecialidadeMedica) AS strEspecialidadeMedica,
                     a.bolAtendeHoraMarcada,
                     COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa,
                     COALESCE(a.strUnidade, '') AS strunidade,
                     CONVERT(varchar(19), w.datDataAlerta, 120) AS datDataAlerta,
+                    a.strAgenda AS strAgendaAtual,
+                    a.strProfissional AS strProfissionalAtual,
+                    CASE
+                        WHEN UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, '')))) <> UPPER(LTRIM(RTRIM(ISNULL(a.strAgenda, '')))) THEN 'paciente_divergente'
+                        WHEN UPPER(LTRIM(RTRIM(ISNULL(w.strProfissional, '')))) <> UPPER(LTRIM(RTRIM(ISNULL(a.strProfissional, '')))) THEN 'profissional_divergente'
+                        ELSE ''
+                    END AS divergenciaAgenda,
                     CASE
                         WHEN @templateNewScheduleConfigured = 1 THEN 'agendamento'
                         ELSE 'agendamento_sem_template'
@@ -236,11 +288,12 @@ class MessageRepository {
                   AND len(w.strTelefone) >= 10
                   AND w.datDataAlerta = appointment.appointmentAt
                   AND NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
+                  AND NULLIF(LTRIM(RTRIM(w.strAgenda)), '') IS NOT NULL
                   AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
-                  AND CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE() + 1)
+                  AND CONVERT(DATE, w.datDataAlerta) > CONVERT(DATE, GETDATE() + 1)
                   AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
-                  AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-                  AND (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
+                  AND (@messagingStartDate IS NULL OR CONVERT(DATE, w.datDataAlerta) >= CONVERT(DATE, @messagingStartDate))
+                  AND (@testModeEnabled = 0 OR w.strAgenda LIKE @testNameFilter)
 
                 UNION ALL
 
@@ -248,20 +301,27 @@ class MessageRepository {
                     w.intWhatsAppEnvioId,
                     w.intAgendaId,
                     w.strTipo,
-                    a.strAgenda,
+                    w.strAgenda,
                     w.strTelefone,
                     IsNull(w.bolEnviado,'N') AS bolEnviado,
                     IsNull(w.bolConfirma,'N') AS bolConfirma,
                     w.bolMensagemErro,
-                    convert(varchar, a.datAgendamento, 103) as datagenda,
-                    a.datAgendamento,
-                    a.strHora,
-                    a.strProfissional,
-                    a.strEspecialidadeMedica,
+                    convert(varchar, w.datDataAlerta, 103) as datagenda,
+                    w.datDataAlerta AS datAgendamento,
+                    CONVERT(varchar(5), w.datDataAlerta, 108) AS strHora,
+                    w.strProfissional,
+                    COALESCE(NULLIF(LTRIM(RTRIM(w.strProcedimento)), ''), a.strEspecialidadeMedica) AS strEspecialidadeMedica,
                     a.bolAtendeHoraMarcada,
                     COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa,
                     COALESCE(a.strUnidade, '') AS strunidade,
                     CONVERT(varchar(19), w.datDataAlerta, 120) AS datDataAlerta,
+                    a.strAgenda AS strAgendaAtual,
+                    a.strProfissional AS strProfissionalAtual,
+                    CASE
+                        WHEN UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, '')))) <> UPPER(LTRIM(RTRIM(ISNULL(a.strAgenda, '')))) THEN 'paciente_divergente'
+                        WHEN UPPER(LTRIM(RTRIM(ISNULL(w.strProfissional, '')))) <> UPPER(LTRIM(RTRIM(ISNULL(a.strProfissional, '')))) THEN 'profissional_divergente'
+                        ELSE ''
+                    END AS divergenciaAgenda,
                     CASE
                         WHEN @templateReminderConfigured = 1 THEN 'confirmacao'
                         WHEN @templateNewScheduleConfigured = 1 THEN 'confirmacao_fallback_agendamento'
@@ -283,10 +343,11 @@ class MessageRepository {
                   AND len(w.strTelefone) >= 10
                   AND w.datDataAlerta = appointment.appointmentAt
                   AND NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
+                  AND NULLIF(LTRIM(RTRIM(w.strAgenda)), '') IS NOT NULL
                   AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
-                  AND CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
+                  AND CONVERT(DATE, w.datDataAlerta) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
                   AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
-                  AND (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
+                  AND (@messagingStartDate IS NULL OR CONVERT(DATE, w.datDataAlerta) >= CONVERT(DATE, @messagingStartDate))
                   AND (
                     @skipPastAppointmentTime = 0
                     OR ISNULL(
@@ -294,7 +355,7 @@ class MessageRepository {
                         a.datAgendamento
                     ) >= GETDATE()
                   )
-                  AND (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
+                  AND (@testModeEnabled = 0 OR w.strAgenda LIKE @testNameFilter)
                   AND NOT EXISTS (
                     SELECT 1
                     FROM tblWhatsAppEnvio wOk
@@ -353,6 +414,9 @@ class MessageRepository {
                 strEmpresa,
                 strunidade,
                 datDataAlerta,
+                strAgendaAtual,
+                strProfissionalAtual,
+                divergenciaAgenda,
                 tipoFila
             FROM candidatos
             ORDER BY datAgendamento, strHora, intWhatsAppEnvioId
@@ -381,14 +445,14 @@ class MessageRepository {
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
                 w.strTipo,
-                a.strAgenda,
+                w.strAgenda,
                 w.intWhatsAppEnvioId, 
                 w.intAgendaId,
                 CONVERT(varchar(19), w.datDataAlerta, 120) AS datDataAlerta,
-                convert(varchar, a.datAgendamento, 103) as datagenda, 
-                a.strHora, 
-                a.strProfissional,
-                a.strEspecialidadeMedica,
+                convert(varchar, w.datDataAlerta, 103) as datagenda, 
+                CONVERT(varchar(5), w.datDataAlerta, 108) AS strHora, 
+                w.strProfissional,
+                COALESCE(NULLIF(LTRIM(RTRIM(w.strProcedimento)), ''), a.strEspecialidadeMedica) AS strEspecialidadeMedica,
                 a.bolAtendeHoraMarcada,
                 COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa,
                 COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS nomeUnidade,
@@ -411,12 +475,13 @@ class MessageRepository {
             and len(w.strTelefone) >= 10 
             and w.datDataAlerta = appointment.appointmentAt
             and NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
+            and NULLIF(LTRIM(RTRIM(w.strAgenda)), '') IS NOT NULL
             and ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
-            and CONVERT(DATE, a.datAgendamento) > CONVERT(DATE, GETDATE() + 1)
+            and CONVERT(DATE, w.datDataAlerta) > CONVERT(DATE, GETDATE() + 1)
             and (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
-            and (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
-            and (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
-            order by a.datAgendamento
+            and (@messagingStartDate IS NULL OR CONVERT(DATE, w.datDataAlerta) >= CONVERT(DATE, @messagingStartDate))
+            and (@testModeEnabled = 0 OR w.strAgenda LIKE @testNameFilter)
+            order by w.datDataAlerta
         `;
 
         const result = await this.pool.request()
@@ -474,14 +539,14 @@ class MessageRepository {
             )
             SELECT top 20
                 '55' + w.strTelefone as strtelefone,
-                a.strAgenda,
+                w.strAgenda,
                 w.intWhatsAppEnvioId, 
                 w.intAgendaId,
                 CONVERT(varchar(19), w.datDataAlerta, 120) AS datDataAlerta,
-                convert(varchar, a.datAgendamento, 103) as datagenda, 
-                a.strHora, 
-                a.strProfissional,
-                a.strEspecialidadeMedica,
+                convert(varchar, w.datDataAlerta, 103) as datagenda, 
+                CONVERT(varchar(5), w.datDataAlerta, 108) AS strHora, 
+                w.strProfissional,
+                COALESCE(NULLIF(LTRIM(RTRIM(w.strProcedimento)), ''), a.strEspecialidadeMedica) AS strEspecialidadeMedica,
                 a.bolAtendeHoraMarcada,
                 COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa,
                 COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS nomeUnidade,
@@ -507,12 +572,13 @@ class MessageRepository {
             and len(w.strTelefone) >= 10 
             and w.datDataAlerta = appointment.appointmentAt
             and NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
+            and NULLIF(LTRIM(RTRIM(w.strAgenda)), '') IS NOT NULL
             and ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
             and (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
             
             -- Regra: Enviar para agendamentos de hoje e amanhã
-            and CONVERT(DATE, a.datAgendamento) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
-            and (@messagingStartDate IS NULL OR CONVERT(DATE, a.datAgendamento) >= CONVERT(DATE, @messagingStartDate))
+            and CONVERT(DATE, w.datDataAlerta) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
+            and (@messagingStartDate IS NULL OR CONVERT(DATE, w.datDataAlerta) >= CONVERT(DATE, @messagingStartDate))
             and (
                 @skipPastAppointmentTime = 0
                 OR ISNULL(
@@ -520,8 +586,8 @@ class MessageRepository {
                     a.datAgendamento
                 ) >= GETDATE()
             )
-            and (@testModeEnabled = 0 OR a.strAgenda LIKE @testNameFilter)
-            order by a.datAgendamento
+            and (@testModeEnabled = 0 OR w.strAgenda LIKE @testNameFilter)
+            order by w.datDataAlerta
         `;
 
         const result = await this.pool.request()

@@ -445,12 +445,22 @@ function montarDadosFormatados(msg) {
 }
 
 function logPayloadFailure(context, msg, payload, error) {
+    const summary = summarizePayload(payload);
+
+    logger.error(`${context} ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
+    logger.error(`${context} payload resumo ID ${msg.intWhatsAppEnvioId}: ${summary}`);
+}
+
+function logPayloadSuccess(context, msg, payload) {
+    logger.info(`${context} payload enviado ID ${msg.intWhatsAppEnvioId}: ${summarizePayload(payload)}`);
+}
+
+function summarizePayload(payload) {
     const template = payload?.templateData?.template;
     const body = (template?.components || []).find((component) => component.type === 'body');
     const parameters = body?.parameters || [];
 
-    logger.error(`${context} ID ${msg.intWhatsAppEnvioId}: ${error.message}`);
-    logger.error(`${context} payload resumo ID ${msg.intWhatsAppEnvioId}: template=${template?.name || '-'}, numero=${payload?.number || '-'}, isClosed=${payload?.isClosed}, parametros=${parameters.length}, valores=${JSON.stringify(parameters.map((parameter) => parameter.text))}`);
+    return `template=${template?.name || '-'}, numero=${payload?.number || '-'}, isClosed=${payload?.isClosed}, parametros=${parameters.length}, valores=${JSON.stringify(parameters.map((parameter) => parameter.text))}`;
 }
 
 async function validarAgendamentoParaEnvio(repository, msg, config, context) {
@@ -614,6 +624,7 @@ async function processarFila() {
                     workerState.currentStep = 'enviando';
                     logger.info(`Enviando Agendamento ID ${msg.intWhatsAppEnvioId}...`);
                     await botService.enviarMensagem(payload);
+                    logPayloadSuccess('Agendamento', msg, payload);
                     workerState.currentStep = 'marcando_enviado';
                     await repository.marcarComoEnviado(msg.intWhatsAppEnvioId, config);
                     addRecentEvent('sent', msg, 'agendamento', 'Mensagem de agendamento enviada.');
@@ -692,6 +703,7 @@ async function processarFila() {
                     workerState.currentStep = 'enviando';
                     logger.info(`Enviando Lembrete ID ${msg.intWhatsAppEnvioId}${usarTemplateAgendamentoParaConfirmacao ? ' com template de agendamento' : ''}...`);
                     await botService.enviarMensagem(payload);
+                    logPayloadSuccess('Lembrete', msg, payload);
                     workerState.currentStep = 'marcando_enviado';
                     await repository.marcarConfirmacaoComoEnviada(msg.intWhatsAppEnvioId, config);
                     addRecentEvent('sent', msg, usarTemplateAgendamentoParaConfirmacao ? 'confirmacao_fallback_agendamento' : 'confirmacao', 'Confirmação de presença enviada.');
