@@ -92,7 +92,14 @@ class MessageRepository {
         const telefoneFilaSemPais = telefoneFila.startsWith('55') ? telefoneFila.slice(2) : telefoneFila;
         if (!telefoneFilaSemPais) return { valido: false, motivo: 'fila_sem_telefone' };
         if (telefoneFilaSemPais !== String(agenda.strTelefoneAtual || '')) {
-            return { valido: false, motivo: 'telefone_divergente' };
+            await this.pool.request()
+                .input('id', sql.Int, queueMessage.intWhatsAppEnvioId)
+                .input('novoTelefone', sql.VarChar(20), agenda.strTelefoneAtual)
+                .query(`
+                    SET CONTEXT_INFO 0x123456;
+                    UPDATE tblWhatsAppEnvio SET strTelefone = @novoTelefone WHERE intWhatsAppEnvioId = @id;
+                `);
+            queueMessage.strtelefone = '55' + agenda.strTelefoneAtual;
         }
 
         if (queueMessage.datDataAlerta) {
