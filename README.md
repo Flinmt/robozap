@@ -72,14 +72,14 @@ As fontes são aplicadas assim:
 2. `.env` da raiz, sem sobrescrever variáveis já existentes;
 3. valores operacionais persistidos em `RUNTIME_CONFIG_PATH`, com prioridade sobre os defaults do ambiente.
 
-`npm start` sempre carrega `.env` da raiz. Arquivos como `.env.imagemcor` só são usados se forem copiados para `.env` ou declarados em `env_file` no Compose/container.
+`npm start` sempre carrega `.env` da raiz. Arquivos como `.env.cliente-a` só são usados se forem copiados para `.env` ou declarados em `env_file` no Compose/container.
 
 ### Variáveis estáticas
 
 | Variável | Padrão | Uso |
 | --- | --- | --- |
 | `PORT` | `3000` | Porta HTTP. |
-| `BASE_PATH` | vazio | Prefixo de todas as rotas administrativas; exemplo: `/imagemcor`. |
+| `BASE_PATH` | vazio | Prefixo de todas as rotas administrativas; exemplo: `/cliente-a`. |
 | `INSTANCE_ID` | vazio | Identificador gravado nos metadados de auditoria. |
 | `RUNTIME_CONFIG_PATH` | `config/runtime-config.json` | JSON persistido pelo painel. |
 | `ADMIN_USER` | `admin` | Usuário do painel. |
@@ -169,7 +169,7 @@ Com `normalizeBrazilMobileNinthDigit=true`, celulares brasileiros no formato `55
 
 Sem `BASE_PATH`: `http://localhost:3000/admin`.
 
-Com `BASE_PATH=/imagemcor`: `http://localhost:3001/imagemcor/admin`.
+Com `BASE_PATH=/cliente-a`: `http://localhost:3001/cliente-a/admin`.
 
 A sessão usa cookie HMAC, `HttpOnly`, `SameSite=Lax` e expira em 8 horas. Todas as rotas `/admin` e `/api/admin/*` exigem autenticação.
 

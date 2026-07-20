@@ -1,13 +1,21 @@
 # Banco de Dados do ROBOZAP
 
-Este documento descreve o schema mínimo necessário para o funcionamento completo do ROBOZAP: painel de fila, produtor, novo agendamento, confirmação, botão por URL, revalidação antes do envio e sincronização opcional de status.
+Este documento descreve o contrato de banco necessário para o funcionamento completo do ROBOZAP: painel de fila, produtor, novo agendamento, confirmação, botão por URL, revalidação antes do envio e sincronização opcional de status.
 
 O levantamento foi feito de duas formas:
 
 - auditoria de todas as consultas em `src/repositories/messageRepository.js`;
-- leitura dos metadados do banco `BIODATA_IMAGEMCOR` em 20/07/2026, sem leitura de dados clínicos e sem alterações.
+- comparação com os metadados de uma instalação compatível, sem leitura de dados de pacientes e sem alterações no banco.
 
-Os tipos e tamanhos abaixo refletem a ImagemCor. Isto é o contrato do ROBOZAP, não uma cópia do schema completo do sistema Biodata: colunas que o restante do sistema clínico exige, mas que o ROBOZAP não acessa, estão fora do escopo.
+Os tipos e tamanhos são referências de compatibilidade encontradas em uma instalação real. Eles não representam uma cópia do schema completo do sistema de origem. Colunas usadas apenas pelo restante do sistema clínico estão fora do escopo.
+
+Há três classificações neste documento:
+
+- **núcleo**: necessária para produzir, selecionar, validar ou atualizar a fila;
+- **recurso opcional**: alimenta uma configuração que pode ser ligada no painel;
+- **extensão possível**: existe em schemas compatíveis e pode enriquecer o payload, mas exige alteração no código atual.
+
+Uma coluna ligada a um recurso opcional pode continuar sendo obrigatória no schema. O SQL Server precisa resolver todas as colunas citadas na consulta, mesmo quando a flag correspondente está desligada.
 
 ## Objetos obrigatórios
 
@@ -19,11 +27,27 @@ Os tipos e tamanhos abaixo refletem a ImagemCor. Isto é o contrato do ROBOZAP, 
 | `dbo.tblEmpresa` | tabela | sim | Resolve o nome da empresa/unidade. |
 | `dbo.fncBase64_Encode` | função escalar | sim no código atual | Gera o token usado no link de confirmação. É chamada mesmo quando o botão está desativado. |
 
+## Recursos opcionais e dependências
+
+| Configuração | Objetos/colunas usados pelo código atual | Efeito |
+| --- | --- | --- |
+| `queueProducerEnabled` | `vwAgenda` e todas as colunas de INSERT de `tblWhatsAppEnvio` | Cria a fila que, sem essa opção, precisa ser abastecida externamente. |
+| `includeProcedure` | `tblWhatsAppEnvio.strProcedimento`, com fallback para `vwAgenda.strEspecialidadeMedica` | Acrescenta procedimento/especialidade ao corpo do template. |
+| `includeCompany` | `vwAgenda.strEmpresa`, `vwAgenda.intEmpresaId`, `tblAgenda.intUnidadeId`, `tblEmpresa.intEmpresaId` e `tblEmpresa.strEmpresa` | Acrescenta o nome da empresa/unidade. |
+| `includeUnit` | `vwAgenda.strUnidade` quando `useAgendaUnitAddress=true`; caso contrário usa `defaultUnitAddress` ou o fallback montado pelo worker | Acrescenta unidade/endereço ao corpo. |
+| `formatTurnSchedule` | `vwAgenda.bolAtendeHoraMarcada` e `vwAgenda.strHora` | Formata horário/turno ou ordem de chegada. |
+| `includeConfirmationButton` | `tblWhatsAppEnvio.intAgendaId` e `dbo.fncBase64_Encode` | Acrescenta botão de URL com token. |
+| `syncAgendaWhatsappStatus` | `tblAgenda.intAgendaId`, `tblAgenda.bolWhatsAppEnviado` e `tblWhatsAppEnvio.intAgendaId` | Grava `S` no status da agenda após sucesso. |
+| `testModeEnabled` | `vwAgenda.strAgenda` e `tblWhatsAppEnvio.strAgenda` | Restringe produção e envio pelo nome do paciente. |
+| `skipPastAppointmentTime` | `vwAgenda.datAgendamento`, `vwAgenda.strHora` e `tblWhatsAppEnvio.datDataAlerta` | Impede confirmação/revalidação de compromissos passados. |
+
+`useTicketOpenForIsClosed`, normalização do nono dígito, horários comerciais e datas de liberação não exigem colunas adicionais no banco.
+
 ## `dbo.tblWhatsAppEnvio`
 
 Todas estas colunas são necessárias. O produtor escreve as 14 colunas de snapshot/estado, e o SQL usa a identidade no `OUTPUT`, ordenação e deduplicação.
 
-| Coluna | Tipo observado | Nulo/default | Uso obrigatório |
+| Coluna | Tipo de referência | Nulo/default | Classificação e uso |
 | --- | --- | --- | --- |
 | `intWhatsAppEnvioId` | `int IDENTITY` | `NOT NULL`, PK | Identificador, atualização, ordenação e escolha do item mais recente. |
 | `strTipo` | `varchar(20)` | `NULL` | Produtor grava `AgendaInicio`; seleção aceita `AgendaInicio` e `agendainicio`. |
@@ -39,7 +63,7 @@ Todas estas colunas são necessárias. O produtor escreve as 14 colunas de snaps
 | `intClienteId` | `int` | `NULL` | Identidade preferencial do paciente na deduplicação. |
 | `intAtendimentoId` | `int` | `NULL` | Snapshot criado pelo produtor. |
 | `strProfissional` | `varchar(100)` | `NULL` | Snapshot e detecção de divergência. |
-| `strProcedimento` | `varchar(6000)` | `NULL` | Procedimento; tem preferência sobre a especialidade da view. |
+| `strProcedimento` | `varchar(6000)` | `NULL` | Recurso opcional `includeProcedure`; tem preferência sobre a especialidade da view. A coluna ainda é citada nos SELECTs. |
 
 Regras de valor importantes:
 
@@ -52,7 +76,7 @@ Regras de valor importantes:
 
 A view deve expor todas as colunas abaixo com nomes compatíveis. O ROBOZAP não depende das demais colunas que a view real possa conter.
 
-| Coluna | Tipo observado | Nulo | Uso obrigatório |
+| Coluna | Tipo de referência | Nulo | Classificação e uso |
 | --- | --- | --- | --- |
 | `intAgendaId` | `int` | não | Identifica o slot e liga a fila à agenda. |
 | `strAgenda` | `varchar(150)` | sim | Nome do paciente, filtro de teste e revalidação. |
@@ -62,14 +86,14 @@ A view deve expor todas as colunas abaixo com nomes compatíveis. O ROBOZAP não
 | `bolBloqueado` | `varchar(1)` | sim | `S` ou `1` impede produção e envio. |
 | `datAgendamento` | `datetime` | não | Data do compromisso e filtros de janela. |
 | `strHora` | `varchar(5)` | sim | Hora `HH:mm`; compõe o instante do compromisso. |
-| `strEmpresa` | `varchar(150)` | sim | Nome principal/fallback da empresa. |
-| `intEmpresaId` | `int` | não | Snapshot e join com `tblEmpresa`. |
+| `strEmpresa` | `varchar(150)` | sim | Recurso opcional `includeCompany` e fallback do nome da unidade. |
+| `intEmpresaId` | `int` | não | Núcleo do snapshot/join; também atende `includeCompany`. |
 | `intClienteId` | `int` | sim | Snapshot e deduplicação. |
 | `intAtendimentoId` | `int` | sim | Snapshot da fila. |
-| `strProcedimento` | `varchar(150)` | sim | Procedimento gravado na fila pelo produtor. |
-| `strEspecialidadeMedica` | `varchar(400)` | sim | Fallback quando `strProcedimento` da fila está vazio. |
-| `bolAtendeHoraMarcada` | `varchar(1)` | sim | Formatação opcional por horário/turno. |
-| `strUnidade` | `varchar(150)` | sim | Texto usado quando `useAgendaUnitAddress=true`. |
+| `strProcedimento` | `varchar(150)` | sim | Recurso opcional `includeProcedure`; é gravado na fila pelo produtor. |
+| `strEspecialidadeMedica` | `varchar(400)` | sim | Recurso opcional `includeProcedure`; fallback quando o procedimento da fila está vazio. |
+| `bolAtendeHoraMarcada` | `varchar(1)` | sim | Recurso opcional `formatTurnSchedule`. |
+| `strUnidade` | `varchar(150)` | sim | Recurso opcional `includeUnit` + `useAgendaUnitAddress`. |
 
 Requisitos de conteúdo da view:
 
@@ -81,26 +105,47 @@ Requisitos de conteúdo da view:
 
 ## `dbo.tblAgenda`
 
-Somente estas três colunas são exigidas pelo ROBOZAP. A tabela real da ImagemCor possui outras colunas por exigência do sistema clínico.
+Somente estas três colunas são referenciadas pelo ROBOZAP. Uma tabela de agenda completa normalmente possui outras colunas exigidas pelo sistema clínico de origem.
 
-| Coluna | Tipo observado | Nulo | Uso obrigatório |
+| Coluna | Tipo de referência | Nulo | Classificação e uso |
 | --- | --- | --- | --- |
 | `intAgendaId` | `int` | não | Join com fila/view. Deve identificar o registro correspondente. |
-| `intUnidadeId` | `int` | sim | Join opcional com `tblEmpresa` para resolver a unidade. |
-| `bolWhatsAppEnviado` | `varchar(1)` | sim | Recebe `S` quando `syncAgendaWhatsappStatus=true`. |
+| `intUnidadeId` | `int` | sim | Recurso opcional `includeCompany`; join com `tblEmpresa` para resolver a unidade. O join existe no SQL em todos os cenários. |
+| `bolWhatsAppEnviado` | `varchar(1)` | sim | Recurso opcional `syncAgendaWhatsappStatus`; recebe `S`. A coluna aparece no batch SQL mesmo quando a flag vale `false`. |
 
 ## `dbo.tblEmpresa`
 
-| Coluna | Tipo observado | Nulo | Uso obrigatório |
+| Coluna | Tipo de referência | Nulo | Classificação e uso |
 | --- | --- | --- | --- |
-| `intEmpresaId` | `int` | não | Join tanto pela empresa da view quanto pela unidade de `tblAgenda`. |
-| `strEmpresa` | `varchar(150)` | sim | Nome enviado no payload quando habilitado. |
+| `intEmpresaId` | `int` | não | Recurso opcional `includeCompany`; join pela empresa da view ou unidade de `tblAgenda`. Os joins existem em todos os cenários. |
+| `strEmpresa` | `varchar(150)` | sim | Recurso opcional `includeCompany`; nome enviado no payload. |
 
-O endereço físico de `tblEmpresa` não é consultado pelo código atual. Para novo agendamento, a unidade pode vir de `vwAgenda.strUnidade`; para confirmação, a consulta SQL fornece um endereço literal e `defaultUnitAddress` pode sobrescrevê-lo.
+Para novo agendamento, o código atual pode usar `vwAgenda.strUnidade`. Para confirmação, a consulta fornece um endereço literal e `defaultUnitAddress` pode sobrescrevê-lo. Campos físicos de endereço da empresa não são consultados atualmente.
+
+## Colunas de extensão possíveis
+
+Schemas compatíveis podem expor campos adicionais de unidade e endereço. Eles são úteis para eliminar endereço literal e montar o sétimo parâmetro dinamicamente, mas **não são consumidos pelo código atual**.
+
+| Objeto possível | Coluna | Tipo de referência | Uso que pode ser implementado |
+| --- | --- | --- | --- |
+| `dbo.vwAgenda` | `intUnidadeId` | `int` | Identificar diretamente a unidade do compromisso. |
+| `dbo.vwAgenda` | `strEnderecoUnidade` | `varchar(200)` | Logradouro da unidade. |
+| `dbo.vwAgenda` | `strNumeroUnidade` | `varchar(10)` | Número da unidade. |
+| `dbo.vwAgenda` | `strBairroUnidade` | `varchar(150)` | Bairro da unidade. |
+| `dbo.vwAgenda` | `strTelefoneUnidade` | `varchar(50)` | Contato da unidade, se o template passar a utilizá-lo. |
+| `dbo.tblEmpresa` | `strEndereco` | `varchar(200)` | Fallback de logradouro pelo cadastro da empresa/unidade. |
+| `dbo.tblEmpresa` | `strNumero` | `varchar(10)` | Fallback de número. |
+| `dbo.tblEmpresa` | `strComplemento` | `varchar(150)` | Complemento do endereço. |
+| `dbo.tblEmpresa` | `strBairro` | `varchar(150)` | Fallback de bairro. |
+| `dbo.tblEmpresa` | `intCidadeId` | `int` | Liga a uma tabela de cidades, caso ela faça parte da integração. |
+| `dbo.tblEmpresa` | `strEstado` | `char(2)` | UF. |
+| `dbo.tblEmpresa` | `strCEP` | `varchar(10)` | CEP. |
+
+Para usar esses campos, é necessário alterar os SELECTs de `messageRepository.js` e o mapeamento de `montarDadosFormatados()` em `src/index.js`. Apenas criar as colunas não muda o payload.
 
 ## `dbo.fncBase64_Encode`
 
-Assinatura observada:
+Assinatura de referência:
 
 ```sql
 dbo.fncBase64_Encode(@string varchar(max)) RETURNS varchar(max)
@@ -147,7 +192,7 @@ Se `syncAgendaWhatsappStatus=false`, o `UPDATE` de `tblAgenda` não é executado
 
 ## Índices recomendados
 
-O banco ImagemCor já possui PK em `tblWhatsAppEnvio.intWhatsAppEnvioId`. Para bases novas, valide planos de execução antes de criar índices. Os acessos do worker se beneficiam de índices equivalentes a:
+`tblWhatsAppEnvio.intWhatsAppEnvioId` deve possuir chave primária/índice único. Para bases novas, valide planos de execução antes de criar outros índices. Os acessos do worker se beneficiam de índices equivalentes a:
 
 - `tblWhatsAppEnvio (intAgendaId, datDataAlerta, intClienteId, intWhatsAppEnvioId)` incluindo estados, telefone e snapshots;
 - `tblWhatsAppEnvio (bolMensagemErro, bolEnviado, strTipo, datDataAlerta)` para novo agendamento;
