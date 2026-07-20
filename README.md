@@ -1,213 +1,248 @@
 # ROBOZAP
 
-Worker Node.js para criar fila de mensagens a partir do SQL Server e enviar templates de WhatsApp pela API PartnerBot.
+Worker Node.js CommonJS que consulta o SQL Server a cada 10 segundos, opcionalmente cria uma fila em `tblWhatsAppEnvio` e envia templates de WhatsApp por um endpoint compatível com a PartnerBot.
 
-O projeto foi pensado para operar por cliente: cada container usa seu proprio `.env`, banco, templates e configuracao operacional.
+Cada processo/container deve representar um cliente e ter ambiente, porta, `BASE_PATH`, banco, `config/` e `logs/` próprios. O código, porém, não filtra registros por empresa: `COMPANY_NAME` é apenas exibido no log e `MessageRepository.getCompanyName()` sempre retorna `null`.
+
+## Estado atual
+
+- Runtime principal: `src/index.js`.
+- Acesso ao banco: `src/repositories/messageRepository.js`.
+- Payload e telefone: `src/utils/formatters.js`.
+- Integração HTTP: `src/services/partnerBotService.js`.
+- Configuração persistente: `src/config/runtimeConfig.js`.
+- Painel server-side: `src/admin/panel.js` (não existe build de frontend).
+- Node.js mínimo: 18.
+- Não existem scripts de lint, teste ou typecheck; a validação disponível é operacional/manual.
 
 ## Funcionalidades
 
-- Envio da mensagem de agendamento realizado.
-- Envio da mensagem de confirmacao/lembrete perto da consulta.
-- Produtor opcional de fila: cria registros em `tblWhatsAppEnvio` a partir da `vwAgenda`.
-- Painel web em `/admin` com login, pausa/retomada, configuracoes operacionais e visualizacao da fila pendente.
-- Modo teste para restringir criacao/envio a pacientes com um texto no nome, por padrao `TESTE`.
-- Sincronizacao opcional de `tblAgenda.bolWhatsAppEnviado` apos sucesso no envio.
+- Produção opcional da fila a partir de `dbo.vwAgenda`.
+- Envio de mensagem de novo agendamento.
+- Envio de confirmação/lembrete para consultas de hoje e amanhã.
+- Fallback: se o template de confirmação estiver vazio, usa o template de novo agendamento.
+- Revalidação do paciente, profissional, telefone, horário e bloqueio imediatamente antes do envio.
+- Consulta opcional de ticket aberto para definir `isClosed` dinamicamente.
+- Modo de teste por trecho do nome do paciente.
+- Pausa, configuração, fila, histórico e rollback pelo painel administrativo.
+- Sincronização opcional de `tblAgenda.bolWhatsAppEnviado`.
 - Logs em `logs/app.log` e `logs/error.log`.
 
-## Fluxo
+## Fluxo executado
 
-1. O produtor opcional busca agendamentos elegiveis na `vwAgenda`.
-2. Ele cria linhas ausentes em `tblWhatsAppEnvio` com `strTipo = 'agendainicio'`.
-3. O worker envia mensagens pendentes da fila.
-4. Ao enviar com sucesso, marca `tblWhatsAppEnvio`.
-5. Quando habilitado, tambem marca `tblAgenda.bolWhatsAppEnviado = 'S'`.
+O worker agenda um ciclo a cada 10 segundos. Não há execução imediata na inicialização.
 
-O produtor nao cria procedure, trigger ou job no banco. A logica fica versionada neste projeto.
+1. Lê `runtime-config.json` e atualiza URL/token da integração.
+2. Interrompe o ciclo se estiver pausado.
+3. Interrompe o ciclo fora do horário comercial, calculado em `America/Sao_Paulo`.
+4. Conecta ao SQL Server.
+5. Se habilitado, produz até `queueProducerLimit` registros em `tblWhatsAppEnvio`.
+6. Se `outboundSendStartDate` ainda não chegou, mantém a fila, mas não envia.
+7. Envia até 20 novos agendamentos cuja consulta ocorre depois de amanhã.
+8. Envia até 20 confirmações/lembretes de consultas de hoje ou amanhã.
+9. Aguarda `sendIntervalSeconds` entre mensagens de cada fila.
 
-## Configuracao
+Antes de cada POST, o worker consulta novamente a agenda. Um item é ignorado se o slot sumiu, ficou duplicado/bloqueado, o paciente ou profissional mudou, o compromisso mudou, saiu do filtro de teste ou já passou quando essa proteção está habilitada. Se apenas o telefone mudou, a fila é atualizada com o telefone atual.
 
-Crie um `.env` a partir de `.env.example`.
+Após sucesso:
 
-Variaveis principais:
+- novo agendamento: define `bolEnviado = 'S'`;
+- confirmação: define `bolConfirma = 'S'` e `bolEnviado = 'S'`;
+- opcionalmente: define `tblAgenda.bolWhatsAppEnviado = 'S'`.
 
-| Variavel | Descricao |
+Após erro de envio, define `bolMensagemErro = 1`. Todas as escritas executam antes `SET CONTEXT_INFO 0x123456`; não remova esse marcador sem validar os triggers do banco.
+
+## Regras SQL de seleção
+
+| Fluxo | Janela e condições principais |
 | --- | --- |
-| `PORT` | Porta do servidor web e painel. |
-| `ADMIN_USER` | Usuario do painel `/admin`. |
-| `ADMIN_PASSWORD` | Senha do painel `/admin`. |
-| `CLIENT_NAME` | Nome do cliente exibido no topo do painel admin. |
-| `CLIENT_CODE` | Codigo interno opcional do cliente no painel admin. |
-| `RUNTIME_CONFIG_PATH` | Caminho do JSON persistente do painel. |
-| `DB_SERVER` | Host do SQL Server. |
-| `DB_NAME` | Nome do banco. |
-| `DB_USER` | Usuario do banco. |
-| `DB_PASSWORD` | Senha do banco. |
-| `URL` | Endpoint PartnerBot. |
-| `SHOWTICKET_URL` | Endpoint opcional para consulta de ticket aberto (`isClosed` dinamico). |
-| `AUTH_TOKEN` | Token PartnerBot, incluindo `Bearer` quando aplicavel. |
-| `TEMPLATE_NEW_SCHEDULE` | Template da mensagem de agendamento realizado. |
-| `TEMPLATE_REMINDER` | Template da confirmacao/lembrete. |
+| Produtor | Agenda entre hoje e `queueProducerLookaheadDays`, paciente e telefone válidos, slot não bloqueado e sem item equivalente na fila. |
+| Novo agendamento | `strTipo` igual a `AgendaInicio`/`agendainicio`, não enviado, sem erro e data posterior a amanhã. |
+| Confirmação | Não confirmada, sem erro e data entre hoje e amanhã. A consulta elimina duplicidades e itens já confirmados equivalentes. |
 
-Configuracoes operacionais:
+O modo de teste acrescenta um `LIKE %filtro%` ao nome. `messagingStartDate` limita a data mínima consultada. `skipPastAppointmentTime` afeta confirmação e revalidação; novos agendamentos já são sempre futuros.
 
-| Variavel | Padrao | Descricao |
+## Configuração e precedência
+
+Crie o `.env` da raiz a partir de `.env.example`.
+
+As fontes são aplicadas assim:
+
+1. variáveis de processo/container;
+2. `.env` da raiz, sem sobrescrever variáveis já existentes;
+3. valores operacionais persistidos em `RUNTIME_CONFIG_PATH`, com prioridade sobre os defaults do ambiente.
+
+`npm start` sempre carrega `.env` da raiz. Arquivos como `.env.imagemcor` só são usados se forem copiados para `.env` ou declarados em `env_file` no Compose/container.
+
+### Variáveis estáticas
+
+| Variável | Padrão | Uso |
 | --- | --- | --- |
-| `PARTNERBOT_IS_CLOSED` | `true` | Valor enviado em `isClosed`. |
-| `PARTNERBOT_INCLUDE_COMPANY` | `true` | Inclui empresa nos parametros do template. |
-| `PARTNERBOT_INCLUDE_UNIT` | `true` | Inclui unidade/endereco nos parametros do template. |
-| `PARTNERBOT_INCLUDE_CONFIRMATION_BUTTON` | `true` | Inclui botao de confirmacao no template de lembrete. |
-| `BUSINESS_HOURS_START` | `8` | Hora inicial de envio no fuso de Sao Paulo. |
-| `BUSINESS_HOURS_END` | `17` | Hora final de envio no fuso de Sao Paulo. |
-| `QUEUE_PRODUCER_ENABLED` | `false` | Habilita criacao de fila a partir da agenda. |
-| `QUEUE_PRODUCER_LOOKAHEAD_DAYS` | `365` | Quantos dias futuros o produtor deve descobrir. |
-| `QUEUE_PRODUCER_LIMIT` | `25` | Maximo de linhas criadas por ciclo. |
-| `SEND_INTERVAL_SECONDS` | `10` | Tempo de espera entre envios de mensagens no worker. |
-| `USE_TICKET_OPEN_FOR_IS_CLOSED` | `false` | Se `true`, consulta ticket aberto e define `isClosed` dinamicamente. |
-| `NORMALIZE_BRAZIL_MOBILE_NINTH_DIGIT` | `true` | Remove o 9o digito do celular BR quando aplicavel. |
-| `TEST_MODE_ENABLED` | `false` | Restringe produtor e envio ao filtro de teste. |
-| `TEST_PATIENT_NAME_FILTER` | `TESTE` | Texto usado no modo teste. |
-| `SYNC_AGENDA_WHATSAPP_STATUS` | `false` | Marca `tblAgenda.bolWhatsAppEnviado = 'S'` apos envio. |
-| `MESSAGING_START_DATE` | vazio | Data minima da consulta para criar fila/enviar, no formato `YYYY-MM-DD`. |
-| `SKIP_PAST_APPOINTMENT_TIME` | `false` | Bloqueia confirmacao/lembrete para consulta de hoje cujo horario ja passou. |
-| `OUTBOUND_SEND_START_DATE` | vazio | Data de liberacao dos disparos. Antes dela o worker monta fila, mas nao envia mensagens. |
+| `PORT` | `3000` | Porta HTTP. |
+| `BASE_PATH` | vazio | Prefixo de todas as rotas administrativas; exemplo: `/imagemcor`. |
+| `INSTANCE_ID` | vazio | Identificador gravado nos metadados de auditoria. |
+| `RUNTIME_CONFIG_PATH` | `config/runtime-config.json` | JSON persistido pelo painel. |
+| `ADMIN_USER` | `admin` | Usuário do painel. |
+| `ADMIN_PASSWORD` | vazio | Obrigatório; painel/API retornam 503 sem ele. |
+| `ADMIN_SESSION_SECRET` | senha admin | Segredo HMAC da sessão; use um valor independente. |
+| `DB_SERVER`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | sem padrão | Conexão SQL Server. |
+| `DB_REQUEST_TIMEOUT` | `60000` | Timeout das consultas, em ms. |
+| `URL` | vazio | URL inicial de envio. |
+| `SHOWTICKET_URL` | derivada de `URL` | URL da consulta de ticket. A derivação só troca o sufixo `/template` por `/showticket`. |
+| `AUTH_TOKEN` | vazio | Valor integral do header `Authorization`. |
 
-O painel salva alteracoes em `config/runtime-config.json`. Esse arquivo tem prioridade sobre o `.env` para as configuracoes operacionais.
+`CLIENT_NAME`, `CLIENT_CODE`, `TEMPLATE_NEW_SCHEDULE` e `TEMPLATE_REMINDER` não são lidas do ambiente pelo runtime atual. Cliente e templates devem ser configurados no painel/JSON persistido.
 
-## Painel Admin
+### Defaults operacionais
 
-Acesse:
+Todos podem ser sobrescritos pelo painel e persistidos como nomes camelCase no JSON.
 
-```text
-http://localhost:PORT/admin
+| Variável de ambiente | Campo persistido | Padrão |
+| --- | --- | --- |
+| `WORKER_PAUSED` | `paused` | `true` |
+| — | `clientName`, `clientCode` | vazio |
+| — | `templateNewSchedule`, `templateReminder` | vazio |
+| — | `partnerbotUrl`, `showticketUrl`, `partnerbotAuthToken` | defaults de `URL`, `SHOWTICKET_URL`, `AUTH_TOKEN` |
+| `USE_TICKET_OPEN_FOR_IS_CLOSED` | `useTicketOpenForIsClosed` | `false` |
+| `NORMALIZE_BRAZIL_MOBILE_NINTH_DIGIT` | `normalizeBrazilMobileNinthDigit` | `true` |
+| `PARTNERBOT_IS_CLOSED` | `partnerbotIsClosed` | `false` |
+| `PARTNERBOT_INCLUDE_PROCEDURE` | `includeProcedure` | `false` |
+| `PARTNERBOT_INCLUDE_COMPANY` | `includeCompany` | `false` |
+| `PARTNERBOT_INCLUDE_UNIT` | `includeUnit` | `false` |
+| `PARTNERBOT_INCLUDE_CONFIRMATION_BUTTON` | `includeConfirmationButton` | `false` |
+| `DEFAULT_UNIT_ADDRESS` | `defaultUnitAddress` | vazio |
+| `FORMAT_TURN_SCHEDULE` | `formatTurnSchedule` | `false` |
+| `USE_AGENDA_UNIT_ADDRESS` | `useAgendaUnitAddress` | `false` |
+| `BUSINESS_HOURS_START` | `businessHoursStart` | `8` |
+| `BUSINESS_HOURS_END` | `businessHoursEnd` | `17` |
+| `QUEUE_PRODUCER_ENABLED` | `queueProducerEnabled` | `false` |
+| `QUEUE_PRODUCER_LOOKAHEAD_DAYS` | `queueProducerLookaheadDays` | `7` |
+| `QUEUE_PRODUCER_LIMIT` | `queueProducerLimit` | `50` |
+| `SEND_INTERVAL_SECONDS` | `sendIntervalSeconds` | `10` |
+| `TEST_MODE_ENABLED` | `testModeEnabled` | `true` |
+| `TEST_PATIENT_NAME_FILTER` | `testPatientNameFilter` | `TESTE` |
+| `SYNC_AGENDA_WHATSAPP_STATUS` | `syncAgendaWhatsappStatus` | `false` |
+| `MESSAGING_START_DATE` | `messagingStartDate` | vazio |
+| `SKIP_PAST_APPOINTMENT_TIME` | `skipPastAppointmentTime` | `false` |
+| `OUTBOUND_SEND_START_DATE` | `outboundSendStartDate` | vazio |
+
+Quando `runtime-config.json` ainda não existe, o worker começa pausado, em modo de teste, sem cliente e sem templates. Faça a configuração inicial pelo painel antes de retomar.
+
+## Payload de template
+
+O POST usa `Content-Type: application/json`, header `Authorization` e o formato:
+
+```json
+{
+  "number": "55DDDNUMERO",
+  "isClosed": false,
+  "templateData": {
+    "messaging_product": "whatsapp",
+    "to": "55DDDNUMERO",
+    "type": "template",
+    "template": {
+      "name": "nome_do_template",
+      "language": { "code": "pt_BR" },
+      "components": [
+        { "type": "body", "parameters": [] }
+      ]
+    }
+  }
+}
 ```
 
-No painel e possivel:
+Os parâmetros do corpo são posicionais:
 
-- pausar e retomar o worker;
-- identificar para qual cliente o painel atual esta configurado;
-- alterar templates e flags de payload;
-- sobrescrever o token da PartnerBot por cliente (quando necessario);
-- ligar/desligar produtor de fila;
-- controlar janela e limite do produtor;
-- ligar modo teste;
-- ver a fila pendente.
+1. paciente;
+2. data;
+3. horário;
+4. profissional;
+5. procedimento/especialidade, se `includeProcedure=true`;
+6. empresa, se `includeCompany=true`;
+7. unidade/endereço, se `includeUnit=true`.
 
-## Validacao Rapida de Historico e Rollback
+Na confirmação, `includeConfirmationButton=true` acrescenta um componente `button` de URL com o token produzido por `dbo.fncBase64_Encode`. A quantidade e a ordem precisam coincidir com o template aprovado no WhatsApp.
 
-Exemplo em PowerShell (ajuste host/credenciais conforme ambiente):
+Com `normalizeBrazilMobileNinthDigit=true`, celulares brasileiros no formato `55 + DDD + 9 dígitos`, com `9` após o DDD, perdem esse nono dígito antes do envio.
 
-```powershell
-$base = 'http://localhost:3002/hvisao'
-$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+## Painel administrativo
 
-# 1) Login no painel
-Invoke-WebRequest -Method Post -Uri "$base/admin/login" -WebSession $session -ContentType 'application/x-www-form-urlencoded' -Body 'user=admin&password=admin' | Out-Null
+Sem `BASE_PATH`: `http://localhost:3000/admin`.
 
-# 2) Altera uma secao (safety)
-$body = @{ paused = $true; testModeEnabled = $false; testPatientNameFilter = 'TESTE'; syncAgendaWhatsappStatus = $true } | ConvertTo-Json
-Invoke-RestMethod -Method Put -Uri "$base/api/admin/config/safety" -WebSession $session -ContentType 'application/json' -Body $body
+Com `BASE_PATH=/imagemcor`: `http://localhost:3001/imagemcor/admin`.
 
-# 3) Consulta historico
-Invoke-RestMethod -Method Get -Uri "$base/api/admin/config/history?limit=5&offset=0" -WebSession $session
+A sessão usa cookie HMAC, `HttpOnly`, `SameSite=Lax` e expira em 8 horas. Todas as rotas `/admin` e `/api/admin/*` exigem autenticação.
 
-# 4) Reverte ultimo evento
-Invoke-RestMethod -Method Post -Uri "$base/api/admin/config/revert/last" -WebSession $session
-```
+| Método e rota | Finalidade |
+| --- | --- |
+| `GET /api/admin/status` | Estado do ciclo e eventos recentes. |
+| `GET /api/admin/config` | Configuração em sete seções e metadados. |
+| `POST /api/admin/config/validate/:section` | Validação sem persistência. |
+| `PUT /api/admin/config/:section` | Atualização auditada da seção. |
+| `PUT /api/admin/config` | Atualização flat legada. |
+| `GET /api/admin/queue` | Até 100 itens de cada categoria pendente; timeout de 25 s. |
+| `POST /api/admin/pause` | Pausa o worker. |
+| `POST /api/admin/resume` | Retoma o worker. |
+| `GET /api/admin/config/history?limit=&offset=` | Histórico paginado, mais recente primeiro. |
+| `POST /api/admin/config/revert/last` | Reverte o último evento registrado. |
 
-Endpoints de auditoria disponiveis:
+Os arquivos persistentes e gitignored são:
 
-- `GET /api/admin/config/history?limit=&offset=`
-- `POST /api/admin/config/revert/last`
+- `runtime-config.json`: configuração flat;
+- `runtime-config.history.jsonl`: trilha de alterações;
+- `runtime-config.meta.json`: versão e identificação da instância.
 
-## Modo Teste
+## Banco de dados
 
-Para testar sem enviar mensagens para pacientes reais:
+O contrato completo e compartilhável está em [docs/BANCO_DE_DADOS.md](docs/BANCO_DE_DADOS.md). Ele contém todos os objetos e todas as colunas exigidas por leitura, filtro, join, deduplicação, produção da fila, envio e atualização de status.
 
-```env
-TEST_MODE_ENABLED=true
-TEST_PATIENT_NAME_FILTER=TESTE
-QUEUE_PRODUCER_LIMIT=5
-```
+Resumo dos objetos:
 
-Com isso, o produtor e o envio so usam pacientes cujo nome contenha `TESTE`.
+- `dbo.tblWhatsAppEnvio` — fila e estado do envio;
+- `dbo.vwAgenda` — origem consolidada dos dados da agenda;
+- `dbo.tblAgenda` — unidade e sincronização opcional do status;
+- `dbo.tblEmpresa` — nome da empresa/unidade;
+- `dbo.fncBase64_Encode` — token do botão de confirmação.
 
-## Implantacao Segura
+O usuário SQL precisa de `SELECT` nos quatro objetos de dados e na função, `INSERT`/`UPDATE` em `tblWhatsAppEnvio` e, se a sincronização estiver habilitada, `UPDATE` em `tblAgenda`.
 
-Para um cliente sem produtor de fila no banco:
-
-1. Configure `.env`.
-2. Inicie com:
-
-```env
-QUEUE_PRODUCER_ENABLED=true
-QUEUE_PRODUCER_LOOKAHEAD_DAYS=365
-QUEUE_PRODUCER_LIMIT=5
-TEST_MODE_ENABLED=true
-MESSAGING_START_DATE=2026-05-09
-SKIP_PAST_APPOINTMENT_TIME=true
-OUTBOUND_SEND_START_DATE=2026-05-09
-```
-
-3. Valide no painel com pacientes de teste.
-4. Para producao gradual:
-
-```env
-TEST_MODE_ENABLED=false
-QUEUE_PRODUCER_LIMIT=25
-```
-
-5. Depois de estabilizar, aumente para `50` se necessario.
-
-## Rodar Localmente
+## Execução local
 
 ```bash
 npm install
 npm start
 ```
 
-Ou em desenvolvimento:
+Desenvolvimento com reinício automático:
 
 ```bash
 npm run dev
 ```
 
-## Docker
-
-Build:
-
-```bash
-docker build -t robozap-worker .
-```
-
-Compose:
+## Docker e múltiplos clientes
 
 ```bash
 docker compose up -d --build
 ```
 
-O `docker-compose.yml` monta:
+O Compose incluído possui apenas o serviço genérico `app`, usa `.env` e monta `./config` e `./logs`. Para múltiplos clientes, duplique o serviço e use, para cada um:
 
-- `./config:/usr/src/app/config`, para persistir `runtime-config.json`;
-- `./logs:/usr/src/app/logs`, para persistir logs.
+- `env_file` diferente;
+- `PORT` e `BASE_PATH` diferentes;
+- diretórios diferentes para `/usr/src/app/config` e `/usr/src/app/logs`.
 
-Para multiplos clientes, crie um servico por cliente com seu proprio `.env`, porta, pasta `config` e pasta `logs`.
+Nunca compartilhe `config/runtime-config.json` entre clientes: ele sobrescreve URL, token, cliente, templates e regras vindas do ambiente.
 
-## Observacoes de Banco
+O exemplo de proxy reverso está em `deploy/nginx/worker.partnerbot.com.br.conf`.
 
-O worker espera as tabelas/views:
+## Checklist de implantação segura
 
-- `tblWhatsAppEnvio`
-- `vwAgenda`
-- `tblAgenda`
-- `tblEmpresa`
+1. Configure credenciais, porta, `BASE_PATH` e volumes isolados.
+2. Inicie pausado e com `testModeEnabled=true`.
+3. Configure cliente, templates, integração e parâmetros do payload no painel.
+4. Confirme que o template aprovado possui a mesma quantidade e ordem de parâmetros.
+5. Valide a fila e um paciente contendo o filtro de teste.
+6. Verifique a resposta da integração e os logs.
+7. Só então desative o modo de teste e retome os disparos.
 
-Para o controle atual, `tblWhatsAppEnvio` deve possuir:
-
-- `bolMensagemErro bit NOT NULL DEFAULT 0`
-- `bolConfirma char(1) NOT NULL DEFAULT 'N'`
-
-Quando `SYNC_AGENDA_WHATSAPP_STATUS=true`, o worker atualiza:
-
-```sql
-tblAgenda.bolWhatsAppEnviado = 'S'
-```
+Não use apenas uma resposta HTTP do webhook como prova de entrega: ela pode confirmar somente que o workflow foi iniciado. Verifique também a execução do integrador e o status final na PartnerBot/WhatsApp.
