@@ -702,7 +702,8 @@ async function processarFila() {
 
                     workerState.currentStep = 'enviando';
                     logger.info(`Enviando Lembrete ID ${msg.intWhatsAppEnvioId}${usarTemplateAgendamentoParaConfirmacao ? ' com template de agendamento' : ''}...`);
-                    await botService.enviarMensagem(payload);
+                    const reminderUrl = config.partnerbotReminderUrl || botService.apiUrl;
+                    await botService.enviarMensagem(payload, reminderUrl);
                     logPayloadSuccess('Lembrete', msg, payload);
                     workerState.currentStep = 'marcando_enviado';
                     await repository.marcarConfirmacaoComoEnviada(msg.intWhatsAppEnvioId, config);

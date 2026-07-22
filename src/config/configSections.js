@@ -10,6 +10,7 @@ function toSections(flat) {
         },
         integration: {
             partnerbotUrl: String(flat.partnerbotUrl || ''),
+            partnerbotReminderUrl: String(flat.partnerbotReminderUrl || ''),
             showticketUrl: String(flat.showticketUrl || ''),
             partnerbotAuthToken: String(flat.partnerbotAuthToken || ''),
             useTicketOpenForIsClosed: Boolean(flat.useTicketOpenForIsClosed),
@@ -73,6 +74,9 @@ function validateSection(section, payload) {
         if (typeof payload.partnerbotUrl !== 'string') {
             pushError('partnerbotUrl', 'VALIDATION_PARTNERBOT_URL', 'URL da PartnerBot deve ser texto.');
         }
+        if (typeof payload.partnerbotReminderUrl !== 'string') {
+            pushError('partnerbotReminderUrl', 'VALIDATION_PARTNERBOT_REMINDER_URL', 'URL de confirmacao deve ser texto.');
+        }
         if (typeof payload.showticketUrl !== 'string') {
             pushError('showticketUrl', 'VALIDATION_SHOWTICKET_URL', 'URL do ShowTicket deve ser texto.');
         }
@@ -129,6 +133,7 @@ function toFlatPatch(section, payload) {
     if (section === 'templates') return { templateNewSchedule: payload.newSchedule, templateReminder: payload.reminder };
     if (section === 'integration') return {
         partnerbotUrl: payload.partnerbotUrl,
+        partnerbotReminderUrl: payload.partnerbotReminderUrl,
         showticketUrl: payload.showticketUrl,
         partnerbotAuthToken: payload.partnerbotAuthToken,
         useTicketOpenForIsClosed: payload.useTicketOpenForIsClosed,

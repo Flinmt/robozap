@@ -463,9 +463,14 @@ function renderAdminPage(basePath) {
                 <input id="templateReminder" name="templateReminder" type="text">
               </div>
               <div>
-                <label for="partnerbotUrl">URL da API PartnerBot (opcional)</label>
+                <label for="partnerbotUrl">URL do novo agendamento (opcional)</label>
                 <input id="partnerbotUrl" name="partnerbotUrl" type="text" placeholder="https://.../template">
-                <small class="helper">Sobrescreve a URL do .env para esta instancia.</small>
+                <small class="helper">Destino da primeira mensagem. Sobrescreve URL do .env.</small>
+              </div>
+              <div>
+                <label for="partnerbotReminderUrl">URL da confirmacao/lembrete (opcional)</label>
+                <input id="partnerbotReminderUrl" name="partnerbotReminderUrl" type="text" placeholder="https://.../webhook">
+                <small class="helper">Destino da segunda mensagem. Se vazio, usa a URL do novo agendamento.</small>
               </div>
               <div>
                 <label for="showticketUrl">URL do ShowTicket (opcional)</label>
@@ -707,6 +712,7 @@ function renderAdminPage(basePath) {
       'templateNewSchedule',
       'templateReminder',
       'partnerbotUrl',
+      'partnerbotReminderUrl',
       'showticketUrl',
       'partnerbotAuthToken',
       'useTicketOpenForIsClosed',

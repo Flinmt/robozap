@@ -36,6 +36,7 @@ function parseDateString(value, fallback = '') {
 function getDefaults() {
     return {
         partnerbotUrl: process.env.URL || '',
+        partnerbotReminderUrl: process.env.REMINDER_URL || '',
         showticketUrl: process.env.SHOWTICKET_URL || '',
         clientName: '',
         clientCode: '',
@@ -85,6 +86,7 @@ function normalizeConfig(input) {
 
     return {
         partnerbotUrl: String(merged.partnerbotUrl || ''),
+        partnerbotReminderUrl: String(merged.partnerbotReminderUrl || ''),
         showticketUrl: String(merged.showticketUrl || ''),
         clientName: String(merged.clientName || ''),
         clientCode: String(merged.clientCode || ''),

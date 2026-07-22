@@ -19,7 +19,7 @@ Cada processo/container deve representar um cliente e ter ambiente, porta, `BASE
 
 - Produção opcional da fila a partir de `dbo.vwAgenda`.
 - Envio de mensagem de novo agendamento.
-- Envio de confirmação/lembrete para consultas de hoje e amanhã.
+- Envio de confirmação/lembrete para consultas de hoje e amanhã, com URL própria opcional.
 - Fallback: se o template de confirmação estiver vazio, usa o template de novo agendamento.
 - Revalidação do paciente, profissional, telefone, horário e bloqueio imediatamente antes do envio.
 - Consulta opcional de ticket aberto para definir `isClosed` dinamicamente.
@@ -87,7 +87,8 @@ As fontes são aplicadas assim:
 | `ADMIN_SESSION_SECRET` | senha admin | Segredo HMAC da sessão; use um valor independente. |
 | `DB_SERVER`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | sem padrão | Conexão SQL Server. |
 | `DB_REQUEST_TIMEOUT` | `60000` | Timeout das consultas, em ms. |
-| `URL` | vazio | URL inicial de envio. |
+| `URL` | vazio | URL da primeira mensagem (novo agendamento). |
+| `REMINDER_URL` | vazio | URL da segunda mensagem (confirmação/lembrete). Se vazia, usa `URL`. |
 | `SHOWTICKET_URL` | derivada de `URL` | URL da consulta de ticket. A derivação só troca o sufixo `/template` por `/showticket`. |
 | `AUTH_TOKEN` | vazio | Valor integral do header `Authorization`. |
 
@@ -102,7 +103,10 @@ Todos podem ser sobrescritos pelo painel e persistidos como nomes camelCase no J
 | `WORKER_PAUSED` | `paused` | `true` |
 | — | `clientName`, `clientCode` | vazio |
 | — | `templateNewSchedule`, `templateReminder` | vazio |
-| — | `partnerbotUrl`, `showticketUrl`, `partnerbotAuthToken` | defaults de `URL`, `SHOWTICKET_URL`, `AUTH_TOKEN` |
+| `URL` | `partnerbotUrl` | vazio |
+| `REMINDER_URL` | `partnerbotReminderUrl` | vazio; usa `partnerbotUrl` no envio quando não configurado |
+| `SHOWTICKET_URL` | `showticketUrl` | vazio |
+| `AUTH_TOKEN` | `partnerbotAuthToken` | vazio no JSON; o envio usa `AUTH_TOKEN` como fallback |
 | `USE_TICKET_OPEN_FOR_IS_CLOSED` | `useTicketOpenForIsClosed` | `false` |
 | `NORMALIZE_BRAZIL_MOBILE_NINTH_DIGIT` | `normalizeBrazilMobileNinthDigit` | `true` |
 | `PARTNERBOT_IS_CLOSED` | `partnerbotIsClosed` | `false` |
@@ -162,6 +166,8 @@ Os parâmetros do corpo são posicionais:
 7. unidade/endereço, se `includeUnit=true`.
 
 Na confirmação, `includeConfirmationButton=true` acrescenta um componente `button` de URL com o token produzido por `dbo.fncBase64_Encode`. A quantidade e a ordem precisam coincidir com o template aprovado no WhatsApp.
+
+O primeiro envio usa `partnerbotUrl`. A confirmação usa `partnerbotReminderUrl`; quando esse campo está vazio, usa `partnerbotUrl` para manter compatibilidade com instalações que possuem um único endpoint.
 
 Com `normalizeBrazilMobileNinthDigit=true`, celulares brasileiros no formato `55 + DDD + 9 dígitos`, com `9` após o DDD, perdem esse nono dígito antes do envio.
 

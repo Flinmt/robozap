@@ -11,9 +11,9 @@ class PartnerBotService {
 
     // Envia o payload (JSON) para a API.
     // Retorna a resposta da API ou lança um erro detalhado em falha.
-    async enviarMensagem(payload) {
+    async enviarMensagem(payload, apiUrl = this.apiUrl) {
         try {
-            const response = await axios.post(this.apiUrl, payload, {
+            const response = await axios.post(apiUrl, payload, {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': this.authToken
