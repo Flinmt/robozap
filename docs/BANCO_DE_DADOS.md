@@ -40,6 +40,7 @@ Uma coluna ligada a um recurso opcional pode continuar sendo obrigatória no sch
 | `syncAgendaWhatsappStatus` | `tblAgenda.intAgendaId`, `tblAgenda.bolWhatsAppEnviado` e `tblWhatsAppEnvio.intAgendaId` | Grava `S` no status da agenda após sucesso. |
 | `testModeEnabled` | `vwAgenda.strAgenda` e `tblWhatsAppEnvio.strAgenda` | Restringe produção e envio pelo nome do paciente. |
 | `skipPastAppointmentTime` | `vwAgenda.datAgendamento`, `vwAgenda.strHora` e `tblWhatsAppEnvio.datDataAlerta` | Impede confirmação/revalidação de compromissos passados. |
+| Bloqueio de presença confirmada | `tblAgenda.bolConfirmado` e `tblAgenda.datConfirmacao` | Impede a segunda mensagem quando a presença já foi confirmada ou atendida. |
 
 `useTicketOpenForIsClosed`, normalização do nono dígito, horários comerciais e datas de liberação não exigem colunas adicionais no banco.
 
@@ -105,13 +106,17 @@ Requisitos de conteúdo da view:
 
 ## `dbo.tblAgenda`
 
-Somente estas três colunas são referenciadas pelo ROBOZAP. Uma tabela de agenda completa normalmente possui outras colunas exigidas pelo sistema clínico de origem.
+Somente estas cinco colunas são referenciadas pelo ROBOZAP. Uma tabela de agenda completa normalmente possui outras colunas exigidas pelo sistema clínico de origem.
 
 | Coluna | Tipo de referência | Nulo | Classificação e uso |
 | --- | --- | --- | --- |
 | `intAgendaId` | `int` | não | Join com fila/view. Deve identificar o registro correspondente. |
 | `intUnidadeId` | `int` | sim | Recurso opcional `includeCompany`; join com `tblEmpresa` para resolver a unidade. O join existe no SQL em todos os cenários. |
 | `bolWhatsAppEnviado` | `varchar(1)` | sim | Recurso opcional `syncAgendaWhatsappStatus`; recebe `S`. A coluna aparece no batch SQL mesmo quando a flag vale `false`. |
+| `bolConfirmado` | `char(1)` | sim | Estado clínico. Valores `A` ou `S` bloqueiam a segunda mensagem. |
+| `datConfirmacao` | `datetime` | sim | Quando preenchida, bloqueia a segunda mensagem independentemente do estado. |
+
+`tblWhatsAppEnvio.bolConfirma` informa que o Robozap já enviou a segunda mensagem. Ele não substitui `tblAgenda.bolConfirmado`/`datConfirmacao`, que representam a confirmação clínica.
 
 ## `dbo.tblEmpresa`
 
@@ -228,6 +233,8 @@ INSERT INTO @required (obj, col) VALUES
 ('tblAgenda','intAgendaId'),
 ('tblAgenda','intUnidadeId'),
 ('tblAgenda','bolWhatsAppEnviado'),
+('tblAgenda','bolConfirmado'),
+('tblAgenda','datConfirmacao'),
 ('tblEmpresa','intEmpresaId'),
 ('tblEmpresa','strEmpresa'),
 ('vwAgenda','intAgendaId'),

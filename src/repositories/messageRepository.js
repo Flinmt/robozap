@@ -13,7 +13,16 @@ class MessageRepository {
         return String(value || '').replace(/\s+/g, ' ').trim().toUpperCase();
     }
 
-    async validarAgendamentoAntesDoEnvio(intAgendaId, config = {}, queueMessage = {}) {
+    presencaJaConfirmada(agenda = {}) {
+        const status = String(agenda.bolConfirmado || '').trim().toUpperCase();
+        const temDataConfirmacao = agenda.datConfirmacao !== null
+            && agenda.datConfirmacao !== undefined;
+        return temDataConfirmacao
+            || status === 'A'
+            || status === 'S';
+    }
+
+    async validarAgendamentoAntesDoEnvio(intAgendaId, config = {}, queueMessage = {}, options = {}) {
         const querySelect = `
             SELECT TOP 1
                 COUNT(1) OVER () AS totalLinhasAgenda,
@@ -22,6 +31,8 @@ class MessageRepository {
                 a.strProfissional,
                 currentPhone.finalPhone AS strTelefoneAtual,
                 a.bolBloqueado,
+                TA.bolConfirmado,
+                TA.datConfirmacao,
                 a.datAgendamento,
                 a.strHora,
                 CONVERT(varchar(10), a.datAgendamento, 120) AS dataAgendamentoIso,
@@ -86,6 +97,10 @@ class MessageRepository {
         const profissionalFila = String(queueMessage.strProfissional || '').trim();
         if (profissionalFila && this.normalizeSnapshotText(profissionalFila) !== this.normalizeSnapshotText(agenda.strProfissional)) {
             return { valido: false, motivo: 'profissional_divergente' };
+        }
+
+        if (options.bloquearPresencaConfirmada && this.presencaJaConfirmada(agenda)) {
+            return { valido: false, motivo: 'presenca_ja_confirmada' };
         }
 
         const telefoneFila = String(queueMessage.strtelefone || queueMessage.strTelefone || '').replace(/\D/g, '');
@@ -352,6 +367,8 @@ class MessageRepository {
                   AND NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
                   AND NULLIF(LTRIM(RTRIM(w.strAgenda)), '') IS NOT NULL
                   AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
+                  AND TA.datConfirmacao IS NULL
+                  AND ISNULL(UPPER(LTRIM(RTRIM(TA.bolConfirmado))), 'N') NOT IN ('A', 'S')
                   AND CONVERT(DATE, w.datDataAlerta) BETWEEN CONVERT(DATE, GETDATE()) AND CONVERT(DATE, GETDATE() + 1)
                   AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
                   AND (@messagingStartDate IS NULL OR CONVERT(DATE, w.datDataAlerta) >= CONVERT(DATE, @messagingStartDate))
@@ -581,6 +598,8 @@ class MessageRepository {
             and NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
             and NULLIF(LTRIM(RTRIM(w.strAgenda)), '') IS NOT NULL
             and ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
+            and TA.datConfirmacao IS NULL
+            and ISNULL(UPPER(LTRIM(RTRIM(TA.bolConfirmado))), 'N') NOT IN ('A', 'S')
             and (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
             
             -- Regra: Enviar para agendamentos de hoje e amanhã

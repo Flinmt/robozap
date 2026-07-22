@@ -463,8 +463,8 @@ function summarizePayload(payload) {
     return `template=${template?.name || '-'}, numero=${payload?.number || '-'}, isClosed=${payload?.isClosed}, parametros=${parameters.length}, valores=${JSON.stringify(parameters.map((parameter) => parameter.text))}`;
 }
 
-async function validarAgendamentoParaEnvio(repository, msg, config, context) {
-    const validacao = await repository.validarAgendamentoAntesDoEnvio(msg.intAgendaId, config, msg);
+async function validarAgendamentoParaEnvio(repository, msg, config, context, options = {}) {
+    const validacao = await repository.validarAgendamentoAntesDoEnvio(msg.intAgendaId, config, msg, options);
     if (validacao.valido) return validacao;
 
     logger.warn(`${context} ID ${msg.intWhatsAppEnvioId} ignorado: intAgendaId=${msg.intAgendaId}, motivo=${validacao.motivo}.`);
@@ -673,7 +673,9 @@ async function processarFila() {
                 let payload = null;
                 try {
                     setCurrentMessage(msg, usarTemplateAgendamentoParaConfirmacao ? 'confirmacao_fallback_agendamento' : 'confirmacao', 'validando');
-                    const validacao = await validarAgendamentoParaEnvio(repository, msg, config, 'Lembrete');
+                    const validacao = await validarAgendamentoParaEnvio(repository, msg, config, 'Lembrete', {
+                        bloquearPresencaConfirmada: true
+                    });
                     if (!validacao.valido) {
                         workerState.currentStep = 'ignorado';
                         addRecentEvent('ignored', msg, 'confirmacao', `Lembrete ignorado: ${validacao.motivo}.`);

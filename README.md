@@ -13,7 +13,7 @@ Cada processo/container deve representar um cliente e ter ambiente, porta, `BASE
 - Configuração persistente: `src/config/runtimeConfig.js`.
 - Painel server-side: `src/admin/panel.js` (não existe build de frontend).
 - Node.js mínimo: 18.
-- Não existem scripts de lint, teste ou typecheck; a validação disponível é operacional/manual.
+- Não existem scripts de lint ou typecheck. Os testes usam `node:test` via `npm test`.
 
 ## Funcionalidades
 
@@ -58,7 +58,7 @@ Após erro de envio, define `bolMensagemErro = 1`. Todas as escritas executam an
 | --- | --- |
 | Produtor | Agenda entre hoje e `queueProducerLookaheadDays`, paciente e telefone válidos, slot não bloqueado e sem item equivalente na fila. |
 | Novo agendamento | `strTipo` igual a `AgendaInicio`/`agendainicio`, não enviado, sem erro e data posterior a amanhã. |
-| Confirmação | Não confirmada, sem erro e data entre hoje e amanhã. A consulta elimina duplicidades e itens já confirmados equivalentes. |
+| Confirmação | Não enviada, sem erro, data entre hoje e amanhã e presença clínica ainda não confirmada. A consulta elimina duplicidades e bloqueia `tblAgenda.datConfirmacao` preenchida ou `bolConfirmado` em `A`/`S`. |
 
 O modo de teste acrescenta um `LIKE %filtro%` ao nome. `messagingStartDate` limita a data mínima consultada. `skipPastAppointmentTime` afeta confirmação e revalidação; novos agendamentos já são sempre futuros.
 
@@ -223,6 +223,12 @@ Desenvolvimento com reinício automático:
 
 ```bash
 npm run dev
+```
+
+Testes automatizados:
+
+```bash
+npm test
 ```
 
 ## Docker e múltiplos clientes
