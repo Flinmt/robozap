@@ -432,6 +432,7 @@ function montarDadosFormatados(msg) {
 
     return {
         p_agenda: formatters.limparTexto(msg.strAgenda),
+        p_protocolo: formatters.limparTexto(msg.intNumeroProtocolo),
         p_data: formatters.limparTexto(msg.datagenda),
         p_hora: config.formatTurnSchedule
             ? formatters.formatarHorario(msg.strHora, msg.bolAtendeHoraMarcada)

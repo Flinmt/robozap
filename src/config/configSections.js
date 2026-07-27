@@ -38,6 +38,7 @@ function toSections(flat) {
         payload: {
             partnerbotIsClosed: Boolean(flat.partnerbotIsClosed),
             includeProcedure: Boolean(flat.includeProcedure),
+            includeProtocol: Boolean(flat.includeProtocol),
             includeCompany: Boolean(flat.includeCompany),
             includeUnit: Boolean(flat.includeUnit),
             includeConfirmationButton: Boolean(flat.includeConfirmationButton),
@@ -117,7 +118,7 @@ function validateSection(section, payload) {
     }
 
     if (section === 'payload') {
-        ['partnerbotIsClosed', 'includeProcedure', 'includeCompany', 'includeUnit', 'includeConfirmationButton', 'formatTurnSchedule', 'useAgendaUnitAddress'].forEach((field) => {
+        ['partnerbotIsClosed', 'includeProcedure', 'includeProtocol', 'includeCompany', 'includeUnit', 'includeConfirmationButton', 'formatTurnSchedule', 'useAgendaUnitAddress'].forEach((field) => {
             if (typeof payload[field] !== 'boolean') pushError(field, 'VALIDATION_PAYLOAD_FIELD', `${field} deve ser booleano.`);
         });
         if (typeof payload.defaultUnitAddress !== 'string') {
@@ -157,6 +158,7 @@ function toFlatPatch(section, payload) {
     if (section === 'payload') return {
         partnerbotIsClosed: payload.partnerbotIsClosed,
         includeProcedure: payload.includeProcedure,
+        includeProtocol: payload.includeProtocol,
         includeCompany: payload.includeCompany,
         includeUnit: payload.includeUnit,
         includeConfirmationButton: payload.includeConfirmationButton,

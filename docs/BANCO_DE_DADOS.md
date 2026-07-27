@@ -33,6 +33,7 @@ Uma coluna ligada a um recurso opcional pode continuar sendo obrigatória no sch
 | --- | --- | --- |
 | `queueProducerEnabled` | `vwAgenda` e todas as colunas de INSERT de `tblWhatsAppEnvio` | Cria a fila que, sem essa opção, precisa ser abastecida externamente. |
 | `includeProcedure` | `tblWhatsAppEnvio.strProcedimento`, com fallback para `vwAgenda.strEspecialidadeMedica` | Acrescenta procedimento/especialidade ao corpo do template. |
+| `includeProtocol` | `vwAgenda.intNumeroProtocolo` | Acrescenta o protocolo como segundo parâmetro dos templates inicial e de confirmação. |
 | `includeCompany` | `vwAgenda.strEmpresa`, `vwAgenda.intEmpresaId`, `tblAgenda.intUnidadeId`, `tblEmpresa.intEmpresaId` e `tblEmpresa.strEmpresa` | Acrescenta o nome da empresa/unidade. |
 | `includeUnit` | `vwAgenda.strUnidade` quando `useAgendaUnitAddress=true`; caso contrário usa `defaultUnitAddress` ou o fallback montado pelo worker | Acrescenta unidade/endereço ao corpo. |
 | `formatTurnSchedule` | `vwAgenda.bolAtendeHoraMarcada` e `vwAgenda.strHora` | Formata horário/turno ou ordem de chegada. |
@@ -93,6 +94,7 @@ A view deve expor todas as colunas abaixo com nomes compatíveis. O ROBOZAP não
 | `intAtendimentoId` | `int` | sim | Snapshot da fila. |
 | `strProcedimento` | `varchar(150)` | sim | Recurso opcional `includeProcedure`; é gravado na fila pelo produtor. |
 | `strEspecialidadeMedica` | `varchar(400)` | sim | Recurso opcional `includeProcedure`; fallback quando o procedimento da fila está vazio. |
+| `intNumeroProtocolo` | `int` | sim | Recurso opcional `includeProtocol`; enviado como segundo parâmetro ou `-` quando nulo. |
 | `bolAtendeHoraMarcada` | `varchar(1)` | sim | Recurso opcional `formatTurnSchedule`. |
 | `strUnidade` | `varchar(150)` | sim | Recurso opcional `includeUnit` + `useAgendaUnitAddress`. |
 
@@ -251,6 +253,7 @@ INSERT INTO @required (obj, col) VALUES
 ('vwAgenda','intAtendimentoId'),
 ('vwAgenda','strProcedimento'),
 ('vwAgenda','strEspecialidadeMedica'),
+('vwAgenda','intNumeroProtocolo'),
 ('vwAgenda','bolAtendeHoraMarcada'),
 ('vwAgenda','strUnidade');
 

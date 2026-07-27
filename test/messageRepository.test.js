@@ -122,3 +122,23 @@ test('consultas de fila e envio excluem presenca ja confirmada', async () => {
         assert.match(query, /TA\.bolConfirmado[\s\S]*NOT IN \('A', 'S'\)/i);
     }
 });
+
+test('consultas de envio selecionam o numero de protocolo da agenda', async () => {
+    const pool = createCapturePool();
+    const repository = new MessageRepository(pool);
+    const config = {
+        testModeEnabled: false,
+        testPatientNameFilter: 'TESTE',
+        templateNewSchedule: 'agendamento_inicial',
+        templateReminder: 'lembrete',
+        skipPastAppointmentTime: false
+    };
+
+    await repository.buscarMensagensPendentes(config);
+    await repository.buscarConfirmacoesPendentes(config);
+
+    assert.equal(pool.queries.length, 2);
+    for (const query of pool.queries) {
+        assert.match(query, /a\.intNumeroProtocolo/i);
+    }
+});

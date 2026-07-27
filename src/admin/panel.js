@@ -582,6 +582,10 @@ function renderAdminPage(basePath) {
                 <span>Incluir especialidade/procedimento<small>Adiciona especialidade da vwAgenda como parametro do template.</small></span>
               </label>
               <label class="toggle">
+                <input id="includeProtocol" name="includeProtocol" type="checkbox">
+                <span>Incluir protocolo do agendamento<small>Adiciona vwAgenda.intNumeroProtocolo como segundo parametro do template.</small></span>
+              </label>
+              <label class="toggle">
                 <input id="includeCompany" name="includeCompany" type="checkbox">
                 <span>Incluir empresa no corpo<small>Adiciona empresa como parametro do template.</small></span>
               </label>
@@ -719,6 +723,7 @@ function renderAdminPage(basePath) {
       'normalizeBrazilMobileNinthDigit',
       'partnerbotIsClosed',
       'includeProcedure',
+      'includeProtocol',
       'includeCompany',
       'includeUnit',
       'includeConfirmationButton',

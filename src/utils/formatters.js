@@ -63,11 +63,18 @@ function limparTelefone(telefone, config = {}) {
 
 function montarParametrosCorpo(dados, config) {
     const parameters = [
-        { type: "text", text: dados.p_agenda },
+        { type: "text", text: dados.p_agenda }
+    ];
+
+    if (config.includeProtocol) {
+        parameters.push({ type: "text", text: dados.p_protocolo });
+    }
+
+    parameters.push(
         { type: "text", text: dados.p_data },
         { type: "text", text: dados.p_hora },
         { type: "text", text: dados.p_profissional }
-    ];
+    );
 
     if (config.includeProcedure) {
         parameters.push({ type: "text", text: dados.p_especialidade });

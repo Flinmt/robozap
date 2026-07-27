@@ -111,6 +111,7 @@ Todos podem ser sobrescritos pelo painel e persistidos como nomes camelCase no J
 | `NORMALIZE_BRAZIL_MOBILE_NINTH_DIGIT` | `normalizeBrazilMobileNinthDigit` | `true` |
 | `PARTNERBOT_IS_CLOSED` | `partnerbotIsClosed` | `false` |
 | `PARTNERBOT_INCLUDE_PROCEDURE` | `includeProcedure` | `false` |
+| `PARTNERBOT_INCLUDE_PROTOCOL` | `includeProtocol` | `false` |
 | `PARTNERBOT_INCLUDE_COMPANY` | `includeCompany` | `false` |
 | `PARTNERBOT_INCLUDE_UNIT` | `includeUnit` | `false` |
 | `PARTNERBOT_INCLUDE_CONFIRMATION_BUTTON` | `includeConfirmationButton` | `false` |
@@ -158,12 +159,15 @@ O POST usa `Content-Type: application/json`, header `Authorization` e o formato:
 Os parâmetros do corpo são posicionais:
 
 1. paciente;
-2. data;
-3. horário;
-4. profissional;
-5. procedimento/especialidade, se `includeProcedure=true`;
-6. empresa, se `includeCompany=true`;
-7. unidade/endereço, se `includeUnit=true`.
+2. protocolo do agendamento, se `includeProtocol=true`;
+3. data;
+4. horário;
+5. profissional;
+6. procedimento/especialidade, se `includeProcedure=true`;
+7. empresa, se `includeCompany=true`;
+8. unidade/endereço, se `includeUnit=true`.
+
+O protocolo vem de `vwAgenda.intNumeroProtocolo`. Quando a flag está ativa e o valor é nulo, o worker envia `-` para preservar a posição do template. A flag afeta tanto o agendamento inicial quanto a confirmação/lembrete.
 
 Na confirmação, `includeConfirmationButton=true` acrescenta um componente `button` de URL com o token produzido por `dbo.fncBase64_Encode`. A quantidade e a ordem precisam coincidir com o template aprovado no WhatsApp.
 
