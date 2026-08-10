@@ -23,9 +23,15 @@ class MessageRepository {
     }
 
     async validarAgendamentoAntesDoEnvio(intAgendaId, config = {}, queueMessage = {}, options = {}) {
+        const dataFila = queueMessage.datDataAlerta instanceof Date
+            ? queueMessage.datDataAlerta.toISOString().slice(0, 19).replace('T', ' ')
+            : String(queueMessage.datDataAlerta || '').slice(0, 19).replace('T', ' ');
+
+        if (!dataFila) return { valido: false, motivo: 'fila_sem_data_agendamento' };
+
         const querySelect = `
-            SELECT TOP 1
-                COUNT(1) OVER () AS totalLinhasAgenda,
+            WITH agendaDoSlot AS (
+                SELECT DISTINCT
                 a.intAgendaId,
                 a.strAgenda,
                 a.strProfissional,
@@ -44,60 +50,72 @@ class MessageRepository {
                     ELSE 0
                 END AS horarioPassado,
                 COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa) AS strEmpresa
-            FROM vwAgenda a
-            LEFT JOIN tblAgenda TA ON TA.intAgendaId = a.intAgendaId
-            LEFT JOIN tblEmpresa EUnidade ON EUnidade.intEmpresaId = TA.intUnidadeId
-            LEFT JOIN tblEmpresa EVw ON EVw.intEmpresaId = a.intEmpresaId
-            CROSS APPLY (
-                SELECT telefoneLimpo = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(a.strTelefone, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', ''), '/', '')
-            ) telefone
-            CROSS APPLY (
-                SELECT celularLimpo = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(a.strCelular, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', ''), '/', '')
-            ) celular
-            CROSS APPLY (
-                SELECT rawPhone = CASE
-                    WHEN LEN(celular.celularLimpo) >= 10 THEN celular.celularLimpo
-                    ELSE telefone.telefoneLimpo
-                END
-            ) sourcePhone
-            CROSS APPLY (
-                SELECT finalPhone = CASE
-                    WHEN LEN(sourcePhone.rawPhone) > 11 AND LEFT(sourcePhone.rawPhone, 2) = '55'
-                        THEN SUBSTRING(sourcePhone.rawPhone, 3, 20)
-                    ELSE sourcePhone.rawPhone
-                END
-            ) currentPhone
-            CROSS APPLY (
-                SELECT appointmentAt = ISNULL(
-                    TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
-                    a.datAgendamento
-                )
-            ) appointment
-            WHERE a.intAgendaId = @intAgendaId
+                FROM vwAgenda a
+                LEFT JOIN tblAgenda TA ON TA.intAgendaId = a.intAgendaId
+                LEFT JOIN tblEmpresa EUnidade ON EUnidade.intEmpresaId = TA.intUnidadeId
+                LEFT JOIN tblEmpresa EVw ON EVw.intEmpresaId = a.intEmpresaId
+                CROSS APPLY (
+                    SELECT telefoneLimpo = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(a.strTelefone, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', ''), '/', '')
+                ) telefone
+                CROSS APPLY (
+                    SELECT celularLimpo = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(a.strCelular, ''), ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '.', ''), '/', '')
+                ) celular
+                CROSS APPLY (
+                    SELECT rawPhone = CASE
+                        WHEN LEN(celular.celularLimpo) >= 10 THEN celular.celularLimpo
+                        ELSE telefone.telefoneLimpo
+                    END
+                ) sourcePhone
+                CROSS APPLY (
+                    SELECT finalPhone = CASE
+                        WHEN LEN(sourcePhone.rawPhone) > 11 AND LEFT(sourcePhone.rawPhone, 2) = '55'
+                            THEN SUBSTRING(sourcePhone.rawPhone, 3, 20)
+                        ELSE sourcePhone.rawPhone
+                    END
+                ) currentPhone
+                CROSS APPLY (
+                    SELECT appointmentAt = ISNULL(
+                        TRY_CONVERT(datetime, CONVERT(varchar(10), a.datAgendamento, 120) + ' ' + NULLIF(a.strHora, '')),
+                        a.datAgendamento
+                    )
+                ) appointment
+                WHERE a.intAgendaId = @intAgendaId
+                  AND CONVERT(varchar(19), appointment.appointmentAt, 120) = @appointmentAtIso
+            )
+            SELECT *
+            FROM agendaDoSlot
         `;
 
         const result = await this.pool.request()
             .input('intAgendaId', sql.Int, intAgendaId)
+            .input('appointmentAtIso', sql.VarChar(19), dataFila)
             .input('skipPastAppointmentTime', sql.Bit, config.skipPastAppointmentTime ? 1 : 0)
             .query(querySelect);
 
-        const agenda = result.recordset[0];
-        if (!agenda) return { valido: false, motivo: 'slot_nao_encontrado' };
-        if (Number(agenda.totalLinhasAgenda) > 1) return { valido: false, motivo: 'agenda_duplicada' };
-
-        const nomePaciente = String(agenda.strAgenda || '').trim();
-        if (!nomePaciente) return { valido: false, motivo: 'slot_sem_paciente' };
-
         const pacienteFila = String(queueMessage.strAgenda || '').trim();
         if (!pacienteFila) return { valido: false, motivo: 'fila_sem_paciente' };
-        if (this.normalizeSnapshotText(pacienteFila) !== this.normalizeSnapshotText(agenda.strAgenda)) {
-            return { valido: false, motivo: 'paciente_divergente' };
-        }
-
         const profissionalFila = String(queueMessage.strProfissional || '').trim();
-        if (profissionalFila && this.normalizeSnapshotText(profissionalFila) !== this.normalizeSnapshotText(agenda.strProfissional)) {
-            return { valido: false, motivo: 'profissional_divergente' };
-        }
+        const ocupacoes = result.recordset || [];
+        if (ocupacoes.length === 0) return { valido: false, motivo: 'slot_nao_encontrado' };
+
+        const ocupacoesPreenchidas = ocupacoes.filter(item => String(item.strAgenda || '').trim());
+        if (ocupacoesPreenchidas.length === 0) return { valido: false, motivo: 'slot_sem_paciente' };
+
+        const ocupacoesPaciente = ocupacoesPreenchidas.filter(item => (
+            this.normalizeSnapshotText(item.strAgenda) === this.normalizeSnapshotText(pacienteFila)
+        ));
+        if (ocupacoesPaciente.length === 0) return { valido: false, motivo: 'paciente_divergente' };
+
+        const ocupacoesProfissional = profissionalFila
+            ? ocupacoesPaciente.filter(item => (
+                this.normalizeSnapshotText(item.strProfissional) === this.normalizeSnapshotText(profissionalFila)
+            ))
+            : ocupacoesPaciente;
+        if (ocupacoesProfissional.length === 0) return { valido: false, motivo: 'profissional_divergente' };
+        if (ocupacoesProfissional.length > 1) return { valido: false, motivo: 'agenda_duplicada' };
+
+        const agenda = ocupacoesProfissional[0];
+        const nomePaciente = String(agenda.strAgenda || '').trim();
 
         if (options.bloquearPresencaConfirmada && this.presencaJaConfirmada(agenda)) {
             return { valido: false, motivo: 'presenca_ja_confirmada' };
@@ -117,15 +135,8 @@ class MessageRepository {
             queueMessage.strtelefone = '55' + agenda.strTelefoneAtual;
         }
 
-        if (queueMessage.datDataAlerta) {
-            const dataFila = queueMessage.datDataAlerta instanceof Date
-                ? queueMessage.datDataAlerta.toISOString().slice(0, 19).replace('T', ' ')
-                : String(queueMessage.datDataAlerta || '').slice(0, 19).replace('T', ' ');
-            if (dataFila && dataFila !== agenda.appointmentAtIso) {
-                return { valido: false, motivo: 'compromisso_divergente' };
-            }
-        } else {
-            return { valido: false, motivo: 'fila_sem_data_agendamento' };
+        if (dataFila !== agenda.appointmentAtIso) {
+            return { valido: false, motivo: 'compromisso_divergente' };
         }
 
         const bloqueado = String(agenda.bolBloqueado ?? 'N').trim().toUpperCase();
@@ -231,6 +242,8 @@ class MessageRepository {
                   WHERE w.intAgendaId = a.intAgendaId
                     AND w.datDataAlerta = appointment.appointmentAt
                     AND w.strTipo IN ('AgendaInicio', 'agendainicio')
+                    AND UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, '')))) = UPPER(LTRIM(RTRIM(ISNULL(a.strAgenda, ''))))
+                    AND UPPER(LTRIM(RTRIM(ISNULL(w.strProfissional, '')))) = UPPER(LTRIM(RTRIM(ISNULL(a.strProfissional, ''))))
                     AND (
                         (
                             ISNULL(a.intClienteId, 0) > 0
@@ -264,7 +277,7 @@ class MessageRepository {
     async listarFilaPendente(config) {
         const querySelect = `
             WITH candidatos AS (
-                SELECT TOP 100
+                SELECT DISTINCT TOP 100
                     w.intWhatsAppEnvioId,
                     w.intAgendaId,
                     w.strTipo,
@@ -311,6 +324,11 @@ class MessageRepository {
                   AND w.datDataAlerta = appointment.appointmentAt
                   AND NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
                   AND NULLIF(LTRIM(RTRIM(w.strAgenda)), '') IS NOT NULL
+                  AND UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, '')))) = UPPER(LTRIM(RTRIM(ISNULL(a.strAgenda, ''))))
+                  AND (
+                    NULLIF(LTRIM(RTRIM(ISNULL(w.strProfissional, ''))), '') IS NULL
+                    OR UPPER(LTRIM(RTRIM(ISNULL(w.strProfissional, '')))) = UPPER(LTRIM(RTRIM(ISNULL(a.strProfissional, ''))))
+                  )
                   AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
                   AND CONVERT(DATE, w.datDataAlerta) > CONVERT(DATE, GETDATE() + 1)
                   AND (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
@@ -319,7 +337,7 @@ class MessageRepository {
 
                 UNION ALL
 
-                SELECT TOP 100
+                SELECT DISTINCT TOP 100
                     w.intWhatsAppEnvioId,
                     w.intAgendaId,
                     w.strTipo,
@@ -366,6 +384,11 @@ class MessageRepository {
                   AND w.datDataAlerta = appointment.appointmentAt
                   AND NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
                   AND NULLIF(LTRIM(RTRIM(w.strAgenda)), '') IS NOT NULL
+                  AND UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, '')))) = UPPER(LTRIM(RTRIM(ISNULL(a.strAgenda, ''))))
+                  AND (
+                    NULLIF(LTRIM(RTRIM(ISNULL(w.strProfissional, ''))), '') IS NULL
+                    OR UPPER(LTRIM(RTRIM(ISNULL(w.strProfissional, '')))) = UPPER(LTRIM(RTRIM(ISNULL(a.strProfissional, ''))))
+                  )
                   AND ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
                   AND TA.datConfirmacao IS NULL
                   AND ISNULL(UPPER(LTRIM(RTRIM(TA.bolConfirmado))), 'N') NOT IN ('A', 'S')
@@ -466,7 +489,7 @@ class MessageRepository {
     // Regra principal: Data do agendamento deve ser FUTURA (> Hoje).
     async buscarMensagensPendentes(config = {}) {
         const querySelect = `
-            SELECT top 20
+            SELECT DISTINCT top 20
                 '55' + w.strTelefone as strtelefone,
                 w.strTipo,
                 w.strAgenda,
@@ -501,12 +524,17 @@ class MessageRepository {
             and w.datDataAlerta = appointment.appointmentAt
             and NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
             and NULLIF(LTRIM(RTRIM(w.strAgenda)), '') IS NOT NULL
+            and UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, '')))) = UPPER(LTRIM(RTRIM(ISNULL(a.strAgenda, ''))))
+            and (
+                NULLIF(LTRIM(RTRIM(ISNULL(w.strProfissional, ''))), '') IS NULL
+                or UPPER(LTRIM(RTRIM(ISNULL(w.strProfissional, '')))) = UPPER(LTRIM(RTRIM(ISNULL(a.strProfissional, ''))))
+            )
             and ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
             and CONVERT(DATE, w.datDataAlerta) > CONVERT(DATE, GETDATE() + 1)
             and (@companyName IS NULL OR UPPER(LTRIM(RTRIM(COALESCE(a.strEmpresa, EUnidade.strEmpresa, EVw.strEmpresa)))) = UPPER(@companyName))
             and (@messagingStartDate IS NULL OR CONVERT(DATE, w.datDataAlerta) >= CONVERT(DATE, @messagingStartDate))
             and (@testModeEnabled = 0 OR w.strAgenda LIKE @testNameFilter)
-            order by w.datDataAlerta
+            order by datDataAlerta, intWhatsAppEnvioId
         `;
 
         const result = await this.pool.request()
@@ -562,7 +590,7 @@ class MessageRepository {
                       )
                   )
             )
-            SELECT top 20
+            SELECT DISTINCT top 20
                 '55' + w.strTelefone as strtelefone,
                 w.strAgenda,
                 w.intWhatsAppEnvioId, 
@@ -599,6 +627,11 @@ class MessageRepository {
             and w.datDataAlerta = appointment.appointmentAt
             and NULLIF(LTRIM(RTRIM(a.strAgenda)), '') IS NOT NULL
             and NULLIF(LTRIM(RTRIM(w.strAgenda)), '') IS NOT NULL
+            and UPPER(LTRIM(RTRIM(ISNULL(w.strAgenda, '')))) = UPPER(LTRIM(RTRIM(ISNULL(a.strAgenda, ''))))
+            and (
+                NULLIF(LTRIM(RTRIM(ISNULL(w.strProfissional, ''))), '') IS NULL
+                or UPPER(LTRIM(RTRIM(ISNULL(w.strProfissional, '')))) = UPPER(LTRIM(RTRIM(ISNULL(a.strProfissional, ''))))
+            )
             and ISNULL(CONVERT(varchar(5), a.bolBloqueado), 'N') NOT IN ('S', '1')
             and TA.datConfirmacao IS NULL
             and ISNULL(UPPER(LTRIM(RTRIM(TA.bolConfirmado))), 'N') NOT IN ('A', 'S')
@@ -615,7 +648,7 @@ class MessageRepository {
                 ) >= GETDATE()
             )
             and (@testModeEnabled = 0 OR w.strAgenda LIKE @testNameFilter)
-            order by w.datDataAlerta
+            order by datDataAlerta, intWhatsAppEnvioId
         `;
 
         const result = await this.pool.request()
